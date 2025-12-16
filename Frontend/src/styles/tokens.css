@@ -1,0 +1,165 @@
+/**
+ * Comprehensive Design Token System
+ * Semantic tokens for spacing, sizing, typography, and visual properties
+ * Responsive and accessible design system foundation
+ */
+:root {
+  /* === SEMANTIC SPACING SCALE === */
+  /* Use these tokens for all margin, padding, and gap properties */
+  --spacing-xs: 0.25rem;   /* 4px - tight spacing */
+  --spacing-sm: 0.5rem;    /* 8px - small gaps */
+  --spacing-md: 1rem;      /* 16px - standard spacing */
+  --spacing-lg: 1.5rem;    /* 24px - section gaps */
+  --spacing-xl: 2rem;      /* 32px - major sections */
+  --spacing-2xl: 3rem;     /* 48px - page-level spacing */
+  --spacing-3xl: 4rem;     /* 64px - hero sections */
+  
+  /* === SEMANTIC SIZE TOKENS === */
+  /* Typography and component sizing */
+  --size-xs: 0.75rem;      /* 12px */
+  --size-sm: 0.875rem;     /* 14px */
+  --size-md: 1rem;         /* 16px - base size */
+  --size-lg: 1.125rem;     /* 18px */
+  --size-xl: 1.25rem;      /* 20px */
+  --size-2xl: 1.5rem;      /* 24px */
+  --size-3xl: 1.875rem;    /* 30px */
+  --size-4xl: 2.25rem;     /* 36px */
+  --size-5xl: 3rem;        /* 48px */
+  
+  /* === FONT SCALE TOKENS === */
+  --font-scale-xs: var(--size-xs);
+  --font-scale-sm: var(--size-sm);
+  --font-scale-md: var(--size-md);
+  --font-scale-lg: var(--size-lg);
+  --font-scale-xl: var(--size-xl);
+  --font-scale-2xl: var(--size-2xl);
+  --font-scale-3xl: var(--size-3xl);
+  --font-scale-4xl: var(--size-4xl);
+  --font-scale-5xl: var(--size-5xl);
+  
+  /* === ICON SIZE TOKENS === */
+  --icon-xs: 1rem;         /* 16px */
+  --icon-sm: 1.25rem;      /* 20px */
+  --icon-md: 1.5rem;       /* 24px */
+  --icon-lg: 2rem;         /* 32px */
+  --icon-xl: 2.5rem;       /* 40px */
+  
+  /* === INTERACTIVE TARGET SIZES === */
+  --target-sm: 2.25rem;    /* 36px - minimum touch target */
+  --target-md: 2.75rem;    /* 44px - comfortable target */
+  --target-lg: 3.25rem;    /* 52px - large target */
+  
+  /* === RADIUS TOKENS === */
+  --radius-xs: 0.25rem;    /* 4px */
+  --radius-sm: 0.375rem;   /* 6px */
+  --radius-md: 0.5rem;     /* 8px */
+  --radius-lg: 0.75rem;    /* 12px */
+  --radius-xl: 1rem;       /* 16px */
+  --radius-2xl: 1.5rem;    /* 24px */
+  --radius-full: 9999px;   /* Full rounding */
+  
+  /* === SHADOW TOKENS === */
+  --shadow-xs: 0 1px 2px 0 rgb(0 0 0 / 0.05);
+  --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.1);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+  --shadow-xl: 0 20px 25px -5px rgb(0 0 0 / 0.1), 0 8px 10px -6px rgb(0 0 0 / 0.1);
+  --shadow-2xl: 0 25px 50px -12px rgb(0 0 0 / 0.25);
+  
+  /* === ANIMATION TOKENS === */
+  --anim-fast: 0.15s;      /* Quick micro-interactions */
+  --anim-medium: 0.25s;    /* Standard transitions */
+  --anim-slow: 0.4s;       /* Slow, purposeful animations */
+  --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
+  
+  /* === LAYOUT CONSTRAINTS === */
+  --container-xs: 28rem;    /* 448px */
+  --container-sm: 36rem;    /* 576px */
+  --container-md: 48rem;    /* 768px */
+  --container-lg: 64rem;    /* 1024px */
+  --container-xl: 75rem;    /* 1200px - main content max-width */
+  --container-2xl: 87.5rem; /* 1400px */
+  
+  /* === SIDEBAR LAYOUT === */
+  --sidebar-width-expanded: 18rem;  /* 288px */
+  --sidebar-width-collapsed: 5rem;  /* 80px */
+  --topbar-height: 4.5rem;          /* 72px */
+  
+  /* === BRAND COLORS === */
+  --brand-primary: #1e40af;
+  --brand-primary-light: #3b82f6;
+  --brand-primary-dark: #1e3a8a;
+  --brand-accent: #06b6d4;
+  --brand-accent-light: #67e8f9;
+  --brand-muted: #f1f5f9;
+  --brand-muted-dark: #e2e8f0;
+  
+  /* === SEMANTIC COLORS === */
+  --success: #059669;
+  --success-light: #d1fae5;
+  --warning: #d97706;
+  --warning-light: #fed7aa;
+  --error: #dc2626;
+  --error-light: #fecaca;
+  --info: var(--brand-accent);
+  --info-light: #cffafe;
+  
+  /* === SEMANTIC BACKGROUND & TEXT === */
+  --bg-primary: #ffffff;
+  --bg-secondary: #f8fafc;
+  --bg-tertiary: #f1f5f9;
+  --text-primary: #0f172a;
+  --text-secondary: #475569;
+  --text-muted: #64748b;
+  --border: #e2e8f0;
+  --border-strong: #cbd5e1;
+}
+
+/* === UTILITY CLASSES FOR TOKEN USAGE === */
+.spacing-xs { padding: var(--spacing-xs); }
+.spacing-sm { padding: var(--spacing-sm); }
+.spacing-md { padding: var(--spacing-md); }
+.spacing-lg { padding: var(--spacing-lg); }
+.spacing-xl { padding: var(--spacing-xl); }
+.spacing-2xl { padding: var(--spacing-2xl); }
+
+.gap-xs { gap: var(--spacing-xs); }
+.gap-sm { gap: var(--spacing-sm); }
+.gap-md { gap: var(--spacing-md); }
+.gap-lg { gap: var(--spacing-lg); }
+.gap-xl { gap: var(--spacing-xl); }
+
+.radius-md { border-radius: var(--radius-md); }
+.radius-lg { border-radius: var(--radius-lg); }
+.radius-xl { border-radius: var(--radius-xl); }
+
+.shadow-md { box-shadow: var(--shadow-md); }
+.shadow-lg { box-shadow: var(--shadow-lg); }
+.shadow-xl { box-shadow: var(--shadow-xl); }
+
+.anim-fast { transition-duration: var(--anim-fast); }
+.anim-medium { transition-duration: var(--anim-medium); }
+
+/* === RESPONSIVE CONTAINER === */
+.container-responsive {
+  width: 100%;
+  max-width: var(--container-xl);
+  margin: 0 auto;
+  padding-left: var(--spacing-md);
+  padding-right: var(--spacing-md);
+}
+
+@media (min-width: 640px) {
+  .container-responsive {
+    padding-left: var(--spacing-lg);
+    padding-right: var(--spacing-lg);
+  }
+}
+
+@media (min-width: 1024px) {
+  .container-responsive {
+    padding-left: var(--spacing-xl);
+    padding-right: var(--spacing-xl);
+  }
+}
