@@ -67,8 +67,8 @@ export const Topbar = ({
                 minHeight: 'var(--target-md)',
                 minWidth: 'var(--target-md)'
               }}
-              onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--brand-muted)'}
-              onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+              onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--brand-muted)'}
+              onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
             >
               <FiMenu 
                 style={{ 
@@ -144,13 +144,13 @@ export const Topbar = ({
                   }}
                   onFocus={(e) => {
                     setSearchFocused(true);
-                    e.target.style.boxShadow = `0 0 0 2px var(--brand-primary)20`;
-                    e.target.style.borderColor = 'var(--brand-primary)';
+                    (e.target as HTMLElement).style.boxShadow = `0 0 0 2px var(--brand-primary)20`;
+                    (e.target as HTMLElement).style.borderColor = 'var(--brand-primary)';
                   }}
                   onBlur={(e) => {
                     setSearchFocused(false);
-                    e.target.style.boxShadow = 'none';
-                    e.target.style.borderColor = 'var(--border)';
+                    (e.target as HTMLElement).style.boxShadow = 'none';
+                    (e.target as HTMLElement).style.borderColor = 'var(--border)';
                   }}
                 />
               </div>
@@ -194,8 +194,8 @@ export const Topbar = ({
                   alignItems: 'center',
                   justifyContent: 'center'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--brand-muted)'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--brand-muted)'}
+                onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
               >
                 <FiBell 
                   className="group-hover:text-[var(--brand-primary)] transition-colors anim-fast"
@@ -238,8 +238,8 @@ export const Topbar = ({
                   borderRadius: 'var(--radius-xl)',
                   minHeight: 'var(--target-md)'
                 }}
-                onMouseEnter={(e) => e.target.style.backgroundColor = 'var(--brand-muted)'}
-                onMouseLeave={(e) => e.target.style.backgroundColor = 'transparent'}
+                onMouseEnter={(e) => (e.target as HTMLElement).style.backgroundColor = 'var(--brand-muted)'}
+                onMouseLeave={(e) => (e.target as HTMLElement).style.backgroundColor = 'transparent'}
                 whileHover={{ scale: 1.02 }}
                 whileTap={{ scale: 0.98 }}
               >

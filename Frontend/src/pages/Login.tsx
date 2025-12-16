@@ -18,6 +18,7 @@ export const Login: React.FC = () => {
   const [hrEmail, setHREmail] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessingRedirect, setIsProcessingRedirect] = useState(false);
 
   // Check immediately if this is a Microsoft redirect - don't use useState to avoid delay
   const urlParams = new URLSearchParams(window.location.search);
