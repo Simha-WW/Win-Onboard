@@ -146,8 +146,7 @@ temp/
 docs/build/
 
 # Application specific ignores
-test-hr-api.js
-update-hr-users-ssms.sql
+test_scripts/
 
 # Windows specific
 *.lnk
