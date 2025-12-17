@@ -31,7 +31,7 @@ interface TopbarProps {
  */
 export const Topbar = ({ 
   onMobileMenuToggle, 
-  userName = "Bunny",
+  userName,
   userAvatar,
   unreadNotifications = 0
 }: TopbarProps) => {

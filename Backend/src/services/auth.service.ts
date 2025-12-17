@@ -12,6 +12,9 @@ export interface User {
   firstName?: string;
   lastName?: string;
   role: 'HR' | 'FRESHER';
+  department?: string;
+  designation?: string;
+  username?: string;
 }
 
 export interface AuthResult {
@@ -39,9 +42,13 @@ export class AuthService {
     return jwt.sign(
       { 
         sub: user.id.toString(),
+        id: user.id.toString(),
         email: user.email, 
         firstName: user.firstName,
         lastName: user.lastName,
+        username: user.username,
+        designation: user.designation,
+        department: user.department,
         role: normalizedRole,
         iat: Math.floor(Date.now() / 1000),
         exp: Math.floor(Date.now() / 1000) + (60 * 60) // 1 hour
@@ -228,30 +235,10 @@ export class AuthService {
    */
   static async validateFresherCredentials(username: string, password: string): Promise<AuthResult> {
     try {
-      // Development bypass when database is not connected
-      if (process.env.NODE_ENV === 'development' && (username === 'gaddam.lalithya' || username === 'test.user')) {
-        console.log('🔧 Development bypass for fresher authentication:', username);
-        const user = {
-          id: 'dev-123',
-          email: `${username}@example.com`,
-          firstName: username.split('.')[0],
-          lastName: username.split('.')[1] || 'User',
-          role: 'FRESHER',
-          department: 'Development'
-        };
-        
-        // Generate JWT token for development
-        const token = this.generateToken(user);
-        
-        return {
-          success: true,
-          user,
-          token
-        };
-      }
+      console.log('🔍 Validating fresher credentials for username:', username);
 
       const query = `
-        SELECT id, email, first_name, last_name, password_hash, status 
+        SELECT id, email, first_name, last_name, username, designation, department, password_hash, status 
         FROM freshers 
         WHERE username = @username
       `;
@@ -295,6 +282,9 @@ export class AuthService {
         email: fresher.email,
         firstName: fresher.first_name,
         lastName: fresher.last_name,
+        username: fresher.username,
+        designation: fresher.designation,
+        department: fresher.department,
         role: 'FRESHER'
       };
 
@@ -334,10 +324,13 @@ export class AuthService {
       
       // Create user object from token payload
       const user: User = {
-        id: decoded.id,
+        id: decoded.id || decoded.sub,
         email: decoded.email,
-        firstName: '',
-        lastName: '',
+        firstName: decoded.firstName || '',
+        lastName: decoded.lastName || '',
+        username: decoded.username,
+        designation: decoded.designation,
+        department: decoded.department,
         role: decoded.role
       };
 

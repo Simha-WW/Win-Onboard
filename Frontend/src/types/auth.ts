@@ -7,8 +7,10 @@ export interface User {
   email: string;
   firstName?: string;
   lastName?: string;
-  role: 'HR' | 'FRESHER';
+  username?: string;
+  designation?: string;
   department?: string;
+  role: 'HR' | 'FRESHER';
 }
 
 export interface AuthState {

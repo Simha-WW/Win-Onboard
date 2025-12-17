@@ -40,7 +40,7 @@ interface ApiError {
  * Centralized service for all HR-related API calls
  */
 class HrApiService {
-  private baseUrl = 'http://localhost:3002/api/hr';
+  private baseUrl = 'http://localhost:3000/api/hr';
 
   /**
    * Create a new fresher account

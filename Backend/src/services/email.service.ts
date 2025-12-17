@@ -272,6 +272,286 @@ This is an automated message. Please do not reply to this email.
     `.trim();
   }
 
+  /**
+   * Send IT equipment notification when new user is onboarded
+   */
+  async sendITEquipmentNotification({
+    itMemberEmail,
+    itMemberName,
+    fresherName,
+    fresherEmail,
+    designation,
+    department,
+    startDate
+  }: {
+    itMemberEmail: string;
+    itMemberName: string;
+    fresherName: string;
+    fresherEmail: string;
+    designation: string;
+    department: string;
+    startDate: string;
+  }): Promise<EmailSendResult> {
+    try {
+      const instance = new EmailService();
+      
+      if (!instance.transporter) {
+        return {
+          success: false,
+          error: 'Email service not initialized'
+        };
+      }
+
+      const subject = `🖥️ Equipment Setup Required - New Employee: ${fresherName}`;
+      
+      const htmlContent = instance.generateITNotificationHTML({
+        itMemberName,
+        fresherName,
+        fresherEmail,
+        designation,
+        department,
+        startDate
+      });
+
+      const mailOptions = {
+        from: `"HR Department" <${process.env.SMTP_USER}>`,
+        to: itMemberEmail,
+        subject: subject,
+        html: htmlContent,
+        text: `
+Equipment Setup Required
+
+Dear ${itMemberName},
+
+A new employee has been added to our onboarding system and will be joining soon. Please prepare the following equipment:
+
+Employee Details:
+- Name: ${fresherName}
+- Email: ${fresherEmail}
+- Designation: ${designation}
+- Department: ${department}
+- Expected Start Date: ${startDate}
+
+Equipment Required:
+✓ Laptop (configured with necessary software)
+✓ Mouse
+✓ Headphones
+✓ Any department-specific equipment
+
+Please ensure all equipment is ready and configured before their start date.
+
+Best regards,
+HR Department
+
+This is an automated notification from the onboarding system.
+        `.trim()
+      };
+
+      const info = await instance.transporter.sendMail(mailOptions);
+      
+      console.log(`✅ IT notification email sent to: ${itMemberEmail}`);
+      console.log(`📧 Message ID: ${info.messageId}`);
+      
+      return {
+        success: true,
+        messageId: info.messageId
+      };
+
+    } catch (error) {
+      console.error('❌ Failed to send IT equipment notification:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Generate HTML content for IT equipment notification
+   */
+  private generateITNotificationHTML({
+    itMemberName,
+    fresherName,
+    fresherEmail,
+    designation,
+    department,
+    startDate
+  }: {
+    itMemberName: string;
+    fresherName: string;
+    fresherEmail: string;
+    designation: string;
+    department: string;
+    startDate: string;
+  }): string {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Equipment Setup Required</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #007bff;
+        }
+        .header h1 {
+            color: #007bff;
+            margin: 0;
+            font-size: 28px;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        .employee-details {
+            background-color: #f8f9fa;
+            border-left: 4px solid #007bff;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .employee-details h3 {
+            color: #007bff;
+            margin-top: 0;
+        }
+        .detail-row {
+            margin: 10px 0;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .equipment-list {
+            background-color: #e8f4f8;
+            border-left: 4px solid #28a745;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .equipment-list h3 {
+            color: #28a745;
+            margin-top: 0;
+        }
+        .equipment-item {
+            padding: 8px 0;
+            border-bottom: 1px solid #dee2e6;
+        }
+        .equipment-item:last-child {
+            border-bottom: none;
+        }
+        .equipment-item::before {
+            content: "✓ ";
+            color: #28a745;
+            font-weight: bold;
+        }
+        .action-required {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .action-required h4 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            font-size: 14px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🖥️ Equipment Setup Required</h1>
+            <p>New Employee Onboarding Notification</p>
+        </div>
+        
+        <div class="greeting">
+            <p>Dear ${itMemberName},</p>
+        </div>
+        
+        <p>A new employee has been successfully added to our onboarding system and will be joining our team soon. Please prepare the necessary equipment and workspace setup.</p>
+        
+        <div class="employee-details">
+            <h3>📋 Employee Details</h3>
+            <div class="detail-row">
+                <span class="detail-label">Name:</span> ${fresherName}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Email:</span> ${fresherEmail}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Designation:</span> ${designation}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Department:</span> ${department}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Expected Start Date:</span> ${startDate}
+            </div>
+        </div>
+        
+        <div class="equipment-list">
+            <h3>🛠️ Equipment Required</h3>
+            <div class="equipment-item">Laptop (configured with necessary software and domain access)</div>
+            <div class="equipment-item">Mouse (wired or wireless)</div>
+            <div class="equipment-item">Headphones (for meetings and calls)</div>
+            <div class="equipment-item">Monitor (if required for the role)</div>
+            <div class="equipment-item">Keyboard (if preferred setup)</div>
+            <div class="equipment-item">Any department-specific software or access credentials</div>
+        </div>
+        
+        <div class="action-required">
+            <h4>⏰ Action Required</h4>
+            <p>Please ensure all equipment is ready, tested, and properly configured before the employee's start date. This includes:</p>
+            <ul>
+                <li>Operating system updates and necessary software installations</li>
+                <li>Domain/network access configuration</li>
+                <li>Email account setup verification</li>
+                <li>VPN access if applicable</li>
+                <li>Department-specific application access</li>
+            </ul>
+        </div>
+        
+        <p>If you need any additional information about the new employee's role or specific equipment requirements, please coordinate with the HR department.</p>
+        
+        <p>Thank you for ensuring a smooth onboarding experience for our new team member!</p>
+        
+        <p><strong>Best regards,</strong><br>HR Department</p>
+    </div>
+    
+    <div class="footer">
+        <p>This is an automated notification from the employee onboarding system.</p>
+        <p>For questions or concerns, please contact the HR department.</p>
+    </div>
+</body>
+</html>
+    `.trim();
+  }
+
   // TODO: Implement email template system with external files
   // TODO: Add support for email attachments (employee handbook, etc.)
   // TODO: Implement email tracking and delivery confirmation

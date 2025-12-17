@@ -6,7 +6,7 @@
 import axios from 'axios';
 import { AuthResponse, LoginCredentials, User } from '../types/auth';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3002/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
 
 const authApi = axios.create({
   baseURL: API_BASE_URL,
@@ -141,7 +141,7 @@ authApi.interceptors.response.use(
       const token = localStorage.getItem('auth_token');
       if (token) {
         try {
-          const refreshResponse = await fetch('http://localhost:3002/api/auth/refresh', {
+          const refreshResponse = await fetch('http://localhost:3000/api/auth/refresh', {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,

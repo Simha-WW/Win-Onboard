@@ -44,6 +44,15 @@ async function startServer() {
     try {
       await initializeDatabases();
       console.log('✅ Database connections established');
+      
+      // Initialize IT service and ensure IT_users table exists
+      try {
+        const { ITService } = await import('./services/it.service');
+        await ITService.ensureITUsersTable();
+        console.log('✅ IT service initialized successfully');
+      } catch (itError) {
+        console.error('⚠️ IT service initialization failed:', itError);
+      }
     } catch (dbError) {
       console.log('⚠️  Database connection failed, starting server without database');
       console.log('Note: Authentication and database features will not work until database is connected');

@@ -5,11 +5,13 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { FiCheckCircle, FiClock, FiUsers, FiCalendar } from 'react-icons/fi';
+import { useAuth } from '../contexts/AuthContext';
 
 export const NewHireHome = () => {
   console.log('NewHireHome rendering...');
   
   const navigate = useNavigate();
+  const { user } = useAuth();
   
   // Calculate progress percentage
   const tasksCompleted = 6;
@@ -37,7 +39,7 @@ export const NewHireHome = () => {
           marginBottom: '8px',
           fontWeight: '500'
         }}>
-          Hello Bunny, we're excited to have you join our team!
+          Hello {user ? (user.firstName || user.username || 'there') : 'there'}, we're excited to have you join our team!
         </p>
         <p style={{ 
           color: '#6b7280', 

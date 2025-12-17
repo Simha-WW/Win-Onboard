@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react';
 import { Outlet } from 'react-router-dom';
 import { SideNav } from './SideNav';
 import { Topbar } from './Topbar';
+import { useAuth } from '../../contexts/AuthContext';
 
 /**
  * Main application shell with responsive sidebar and content layout
@@ -14,6 +15,7 @@ import { Topbar } from './Topbar';
 export const Shell = () => {
   console.log('Shell component rendering...');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const { user } = useAuth();
 
   return (
     <div style={{ display: 'flex', height: '100vh', backgroundColor: '#f8f9fa' }}>
@@ -29,7 +31,7 @@ export const Shell = () => {
         {/* Top Bar */}
         <Topbar
           onMobileMenuToggle={() => {}}
-          userName="Bunny"
+          userName={user ? `${user.firstName || ''} ${user.lastName || ''}`.trim() || user.username || user.email : 'User'}
           unreadNotifications={3}
         />
 
