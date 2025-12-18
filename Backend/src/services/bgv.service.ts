@@ -52,6 +52,26 @@ interface Personal {
   emergency_contacts: EmergencyContact[];
 }
 
+interface DocumentFile {
+  name: string;
+  data: string;  // base64 encoded
+  type: string;  // mime type
+  size: number;  // file size in bytes
+}
+
+interface EducationalQualification {
+  qualification: string;
+  university_institution: string;
+  cgpa_percentage: string;
+  year_of_passing: number;
+  documents: DocumentFile[];
+}
+
+interface AdditionalQualification {
+  certificate_name: string;
+  documents: DocumentFile[];
+}
+
 interface Demographics {
   salutation?: string;
   first_name: string;
@@ -447,6 +467,7 @@ export class BGVService {
         .input('fresherId', mssql.Int, fresherId)
         .query(`
           SELECT 
+            id,
             first_name as firstName,
             last_name as lastName,
             email,
@@ -1000,6 +1021,199 @@ export class BGVService {
       console.log(`✅ Submission progress updated: ${currentSection}`);
     } catch (error) {
       console.error('Error updating submission progress:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update educational_details table schema
+   */
+  static async updateEducationalTableSchema(): Promise<void> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+
+      // Check if educational_details table exists, create if not
+      console.log('🔧 Checking if educational_details table exists...');
+      const checkTable = await pool.request().query(`
+        SELECT COUNT(*) as table_count 
+        FROM INFORMATION_SCHEMA.TABLES 
+        WHERE TABLE_NAME = 'educational_details'
+      `);
+      
+      if (checkTable.recordset[0].table_count === 0) {
+        console.log('🔧 Creating educational_details table...');
+        await pool.request().query(`
+          CREATE TABLE educational_details (
+            id INT IDENTITY(1,1) PRIMARY KEY,
+            fresher_id INT NOT NULL,
+            qualification_type NVARCHAR(50) NOT NULL,
+            qualification NVARCHAR(200),
+            university_institution NVARCHAR(500),
+            cgpa_percentage NVARCHAR(50),
+            year_of_passing INT,
+            certificate_name NVARCHAR(500),
+            documents NVARCHAR(MAX),
+            created_at DATETIME2 DEFAULT GETDATE(),
+            updated_at DATETIME2 DEFAULT GETDATE(),
+            CONSTRAINT FK_educational_details_fresher FOREIGN KEY (fresher_id) REFERENCES freshers(id) ON DELETE CASCADE
+          )
+        `);
+        console.log('✅ educational_details table created successfully');
+      } else {
+        console.log('✅ educational_details table already exists');
+        
+        // Migration: Check if employee_id exists and needs to be replaced with fresher_id
+        try {
+          const checkEmployeeId = await pool.request().query(`
+            SELECT COUNT(*) as col_count 
+            FROM sys.columns 
+            WHERE object_id = OBJECT_ID('educational_details') AND name = 'employee_id'
+          `);
+          
+          if (checkEmployeeId.recordset[0].col_count > 0) {
+            console.log('🔧 Migrating from employee_id to fresher_id...');
+            
+            // Drop employee_id column
+            await pool.request().query('ALTER TABLE educational_details DROP COLUMN employee_id');
+            console.log('✅ Dropped employee_id column');
+            
+            // Add fresher_id column
+            await pool.request().query('ALTER TABLE educational_details ADD fresher_id INT NOT NULL DEFAULT 0');
+            console.log('✅ Added fresher_id column');
+            
+            // Add foreign key constraint
+            await pool.request().query(`
+              ALTER TABLE educational_details 
+              ADD CONSTRAINT FK_educational_details_fresher 
+              FOREIGN KEY (fresher_id) REFERENCES freshers(id) ON DELETE CASCADE
+            `);
+            console.log('✅ Added foreign key constraint to freshers table');
+          } else {
+            console.log('✅ educational_details table already using fresher_id');
+          }
+        } catch (migrationError: any) {
+          console.error('⚠️ Migration error (may be expected):', migrationError.message);
+        }
+      }
+      
+      console.log('✅ educational_details table schema update completed');
+    } catch (error) {
+      console.error('❌ Error updating educational_details table schema:', error);
+    }
+  }
+
+  /**
+   * Get saved educational details
+   */
+  static async getSavedEducational(fresherId: number): Promise<any> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      const result = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT 
+            id, fresher_id, qualification_type, qualification,
+            university_institution, cgpa_percentage, year_of_passing,
+            certificate_name, documents
+          FROM educational_details 
+          WHERE fresher_id = @fresherId
+          ORDER BY id
+        `);
+
+      console.log('🔍 Raw educational data from DB:', result.recordset);
+      
+      // Parse documents JSON for each record
+      const educationalData = result.recordset.map(record => {
+        if (record.documents) {
+          try {
+            record.documents = JSON.parse(record.documents);
+            console.log('✅ Parsed documents for record', record.id, ':', record.documents);
+          } catch (e) {
+            console.error('❌ Error parsing documents for record', record.id, ':', e);
+            record.documents = [];
+          }
+        } else {
+          record.documents = [];
+        }
+        return record;
+      });
+      
+      return educationalData;
+    } catch (error) {
+      console.error('Error getting saved educational details:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save educational details (both educational qualifications and additional certificates)
+   */
+  static async saveEducational(fresherId: number, educationalData: any[], additionalData: any[]): Promise<void> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      console.log('🔍 Received educational data:', educationalData);
+      console.log('🔍 Received additional data:', additionalData);
+
+      // Delete existing records for this fresher
+      await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('DELETE FROM educational_details WHERE fresher_id = @fresherId');
+
+      // Insert educational qualifications
+      for (const edu of educationalData) {
+        const documentsJson = JSON.stringify(edu.documents || []);
+        console.log('🔍 Educational qualification documents JSON:', documentsJson);
+
+        await pool.request()
+          .input('fresherId', mssql.Int, fresherId)
+          .input('qualificationType', mssql.NVarChar(50), 'educational')
+          .input('qualification', mssql.NVarChar(200), edu.qualification)
+          .input('universityInstitution', mssql.NVarChar(500), edu.university_institution)
+          .input('cgpaPercentage', mssql.NVarChar(50), edu.cgpa_percentage)
+          .input('yearOfPassing', mssql.Int, edu.year_of_passing)
+          .input('documents', mssql.NVarChar(mssql.MAX), documentsJson)
+          .query(`
+            INSERT INTO educational_details (
+              fresher_id, qualification_type, qualification,
+              university_institution, cgpa_percentage, year_of_passing,
+              documents
+            ) VALUES (
+              @fresherId, @qualificationType, @qualification,
+              @universityInstitution, @cgpaPercentage, @yearOfPassing,
+              @documents
+            )
+          `);
+      }
+
+      // Insert additional qualifications/certificates
+      for (const cert of additionalData) {
+        const documentsJson = JSON.stringify(cert.documents || []);
+        console.log('🔍 Additional certificate documents JSON:', documentsJson);
+
+        await pool.request()
+          .input('fresherId', mssql.Int, fresherId)
+          .input('qualificationType', mssql.NVarChar(50), 'additional')
+          .input('certificateName', mssql.NVarChar(500), cert.certificate_name)
+          .input('documents', mssql.NVarChar(mssql.MAX), documentsJson)
+          .query(`
+            INSERT INTO educational_details (
+              fresher_id, qualification_type, certificate_name, documents
+            ) VALUES (
+              @fresherId, @qualificationType, @certificateName, @documents
+            )
+          `);
+      }
+
+      console.log(`✅ Educational details saved for fresher ${fresherId}`);
+    } catch (error) {
+      console.error('Error saving educational details:', error);
       throw error;
     }
   }

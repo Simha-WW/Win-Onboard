@@ -19,6 +19,7 @@ router.get('/fresher-details', bgvController.getFresherDetails.bind(bgvControlle
 router.get('/submission', bgvController.getSubmission.bind(bgvController));
 router.post('/demographics', bgvController.saveDemographics.bind(bgvController));
 router.post('/personal', bgvController.savePersonalInfo.bind(bgvController));
+router.get('/education', bgvController.getEducation.bind(bgvController));
 router.post('/education', bgvController.saveEducation.bind(bgvController));
 router.post('/employment', bgvController.saveEmploymentHistory.bind(bgvController));
 router.post('/upload', bgvController.uploadDocument.bind(bgvController));

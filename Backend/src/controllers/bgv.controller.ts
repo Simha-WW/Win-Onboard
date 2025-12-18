@@ -112,12 +112,40 @@ export class BGVController {
         // Continue without personal data if table doesn't have correct schema yet
       }
 
+      let savedEducation = null;
+      try {
+        // userId is the fresher_id from the token
+        const fresherId = parseInt(userId.toString());
+        const educationalData = await BGVService.getSavedEducational(fresherId);
+        
+        // Separate educational qualifications and additional certificates
+        const educationalQualifications = educationalData.filter(
+          (item: any) => item.qualification_type === 'educational'
+        );
+        const additionalQualifications = educationalData.filter(
+          (item: any) => item.qualification_type === 'additional'
+        );
+        
+        savedEducation = {
+          educationalQualifications,
+          additionalQualifications
+        };
+        
+        console.log('📋 Loaded education data for fresher:', fresherId);
+        console.log('📋 Educational qualifications:', educationalQualifications.length);
+        console.log('📋 Additional qualifications:', additionalQualifications.length);
+      } catch (educationError) {
+        console.error('⚠️ Error loading education data (table may need schema update):', educationError);
+        // Continue without education data if table doesn't exist yet
+      }
+
       res.json({
         success: true,
         submission,
         prefilledData,
         savedDemographics,
-        savedPersonal
+        savedPersonal,
+        savedEducation
       });
     } catch (error) {
       console.error('Error getting BGV submission:', error);
@@ -197,7 +225,7 @@ export class BGVController {
   }
 
   /**
-   * Save education data
+   * Save education data (both educational qualifications and additional certificates)
    * POST /api/bgv/education
    */
   async saveEducation(req: AuthenticatedRequest, res: Response): Promise<void> {
@@ -208,8 +236,25 @@ export class BGVController {
         return;
       }
 
-      const submission = await BGVService.getOrCreateSubmission(userId);
-      // TODO: Implement saveEducation in BGVService
+      const { educationalQualifications, additionalQualifications } = req.body;
+      
+      // Validate that at least one educational qualification is provided
+      if (!educationalQualifications || educationalQualifications.length === 0) {
+        res.status(400).json({ 
+          success: false, 
+          message: 'At least one educational qualification is required' 
+        });
+        return;
+      }
+
+      // userId is the fresher_id from the token
+      const fresherId = parseInt(userId.toString());
+
+      await BGVService.saveEducational(
+        fresherId, 
+        educationalQualifications || [], 
+        additionalQualifications || []
+      );
       
       res.json({
         success: true,
@@ -220,6 +265,47 @@ export class BGVController {
       res.status(500).json({ 
         success: false, 
         message: 'Failed to save education data' 
+      });
+    }
+  }
+
+  /**
+   * Get saved education data
+   * GET /api/bgv/education
+   */
+  async getEducation(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ success: false, message: 'User not authenticated' });
+        return;
+      }
+
+      // userId is the fresher_id from the token
+      const fresherId = parseInt(userId.toString());
+
+      const educationalData = await BGVService.getSavedEducational(fresherId);
+      
+      // Separate educational qualifications and additional certificates
+      const educationalQualifications = educationalData.filter(
+        (item: any) => item.qualification_type === 'educational'
+      );
+      const additionalQualifications = educationalData.filter(
+        (item: any) => item.qualification_type === 'additional'
+      );
+      
+      res.json({
+        success: true,
+        data: {
+          educationalQualifications,
+          additionalQualifications
+        }
+      });
+    } catch (error) {
+      console.error('Error getting education:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to get education data' 
       });
     }
   }
