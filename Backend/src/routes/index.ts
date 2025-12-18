@@ -10,6 +10,7 @@
 import { Router } from 'express';
 import { hrRoutes } from './hr.routes';
 import { authRoutes } from './auth.routes';
+import { bgvRoutes } from './bgv.routes';
 
 const router = Router();
 
@@ -39,6 +40,13 @@ router.use('/auth', authRoutes);
  * Mounted at: /api/hr/*
  */
 router.use('/hr', hrRoutes);
+
+/**
+ * BGV Module Routes
+ * Background Verification and document submission endpoints
+ * Mounted at: /api/bgv/*
+ */
+router.use('/bgv', bgvRoutes);
 
 /**
  * TODO: Add additional route modules as they are implemented

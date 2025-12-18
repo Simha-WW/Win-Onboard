@@ -53,6 +53,15 @@ async function startServer() {
       } catch (itError) {
         console.error('⚠️ IT service initialization failed:', itError);
       }
+
+      // Initialize BGV service and ensure BGV tables exist
+      try {
+        const { BGVService } = await import('./services/bgv.service');
+        await BGVService.initializeBGVTables();
+        console.log('✅ BGV service initialized successfully');
+      } catch (bgvError) {
+        console.error('⚠️ BGV service initialization failed:', bgvError);
+      }
     } catch (dbError) {
       console.log('⚠️  Database connection failed, starting server without database');
       console.log('Note: Authentication and database features will not work until database is connected');

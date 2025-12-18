@@ -161,8 +161,8 @@ class FresherService {
         await ITService.sendEquipmentNotification({
           fresherName: `${fresherRecord.firstName} ${fresherRecord.lastName}`,
           fresherEmail: fresherRecord.email,
-          designation: fresherRecord.designation,
-          department: fresherRecord.department,
+          designation: fresherRecord.designation || 'Not specified',
+          department: fresherRecord.department || 'Not specified',
           startDate: formattedStartDate
         });
 

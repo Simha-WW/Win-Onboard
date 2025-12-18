@@ -65,7 +65,7 @@ export class ITService {
         return;
       }
 
-      const { EmailService } = await import('./email.service');
+      const { emailService } = await import('./email.service');
       
       // Send email to each IT team member
       for (const itMember of itMembers) {

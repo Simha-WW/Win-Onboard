@@ -22,7 +22,7 @@ const mssqlConfig: mssql.config = (() => {
       trustServerCertificate: true, // Required for Azure SQL Server
       enableArithAbort: true,
       requestTimeout: 30000,
-      connectionTimeout: 30000
+      connectTimeout: 30000
     },
     pool: {
       max: 10,

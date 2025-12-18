@@ -289,12 +289,12 @@ export class AuthController {
           department: 'Human Resources'
         }
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Setup HR table error:', error);
       res.status(500).json({
         success: false,
         message: 'Failed to setup HR table',
-        error: error.message
+        error: error?.message || 'Unknown error'
       });
     }
   }

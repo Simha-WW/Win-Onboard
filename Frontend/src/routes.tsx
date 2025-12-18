@@ -8,6 +8,7 @@ import { Shell } from './components/layout/Shell';
 import { NewHireHome } from './pages/NewHireHome';
 import { Checklist } from './pages/Checklist';
 import { Documents } from './pages/Documents';
+import { Policies } from './pages/Policies';
 import { Day1Hub } from './pages/Day1Hub';
 import { Training } from './pages/Training';
 import { Notifications } from './pages/Notifications';
@@ -60,6 +61,10 @@ export const router = createBrowserRouter([
       {
         path: 'documents',
         element: <Documents />
+      },
+      {
+        path: 'policies',
+        element: <Policies />
       },
       {
         path: 'day1-hub',

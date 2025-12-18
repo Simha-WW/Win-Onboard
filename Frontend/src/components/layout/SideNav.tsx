@@ -11,7 +11,8 @@ import {
   FiBookOpen,
   FiBell,
   FiMenu,
-  FiBriefcase
+  FiBriefcase,
+  FiFolder
 } from 'react-icons/fi';
 
 interface NavItem {
@@ -26,6 +27,7 @@ const navItems: NavItem[] = [
   { id: 'home', label: 'Home', path: '/dashboard', icon: FiHome },
   { id: 'checklist', label: 'Checklist', path: '/dashboard/checklist', icon: FiCheckSquare },
   { id: 'documents', label: 'Documents', path: '/dashboard/documents', icon: FiFileText },
+  { id: 'policies', label: 'Policies', path: '/dashboard/policies', icon: FiFolder },
   { id: 'day1', label: 'Day-1 Hub', path: '/dashboard/day1-hub', icon: FiCalendar },
   { id: 'training', label: 'Training', path: '/dashboard/training', icon: FiBookOpen },
   { id: 'notifications', label: 'Notifications', path: '/dashboard/notifications', icon: FiBell, badge: 3 }
