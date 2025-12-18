@@ -60,6 +60,7 @@ async function startServer() {
         await BGVService.initializeBGVTables();
         await BGVService.updatePersonalTableSchema();
         await BGVService.updateEducationalTableSchema();
+        await BGVService.updateVerificationTableSchema();
         console.log('✅ BGV service initialized successfully');
       } catch (bgvError) {
         console.error('⚠️ BGV service initialization failed:', bgvError);

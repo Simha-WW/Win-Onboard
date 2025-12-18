@@ -899,13 +899,32 @@ export class BGVService {
         // Parse emergency contacts JSON if it exists
         if (data.emergency_contacts) {
           try {
-            data.emergency_contacts = JSON.parse(data.emergency_contacts);
-            console.log('✅ Parsed emergency_contacts:', data.emergency_contacts);
+            console.log('🔍 Type of emergency_contacts:', typeof data.emergency_contacts);
+            console.log('🔍 Is emergency_contacts already an object?', typeof data.emergency_contacts === 'object');
+            
+            // Check if it's already parsed (some drivers auto-parse JSON columns)
+            if (typeof data.emergency_contacts === 'string') {
+              data.emergency_contacts = JSON.parse(data.emergency_contacts);
+            }
+            
+            // Normalize field names - handle both 'name' and 'contact_person_name'
+            data.emergency_contacts = data.emergency_contacts.map((contact: any) => ({
+              contact_person_name: contact.contact_person_name || contact.name || '',
+              mobile: contact.mobile || contact.mobile_number || '',
+              relationship: contact.relationship || ''
+            }));
+            
+            console.log('✅ Final normalized emergency_contacts:', data.emergency_contacts);
+            console.log('✅ Number of contacts:', data.emergency_contacts.length);
+            if (data.emergency_contacts.length > 0) {
+              console.log('✅ First contact:', data.emergency_contacts[0]);
+            }
           } catch (e) {
             console.error('❌ Error parsing emergency_contacts:', e);
             data.emergency_contacts = [];
           }
         } else {
+          console.log('⚠️ emergency_contacts is null or undefined');
           data.emergency_contacts = [];
         }
         return data;
@@ -929,8 +948,15 @@ export class BGVService {
       console.log('🔍 Received personal data:', data);
       console.log('🔍 Emergency contacts to save:', data.emergency_contacts);
 
+      // Map emergency contacts to use consistent field names
+      const emergencyContacts = (data.emergency_contacts || []).map((contact: any) => ({
+        contact_person_name: contact.name || contact.contact_person_name || '',
+        mobile: contact.mobile || '',
+        relationship: contact.relationship || ''
+      }));
+
       // Convert emergency contacts array to JSON string
-      const emergencyContactsJson = JSON.stringify(data.emergency_contacts || []);
+      const emergencyContactsJson = JSON.stringify(emergencyContacts);
       console.log('🔍 Emergency contacts JSON string:', emergencyContactsJson);
 
       // Check if personal info exists
@@ -1366,6 +1392,245 @@ export class BGVService {
       }
     } catch (error) {
       console.error('Error sending document rejection email:', error);
+    }
+  }
+
+  /**
+   * Initialize BGV verifications table
+   */
+  static async updateVerificationTableSchema(): Promise<void> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      console.log('🔧 Creating bgv_verifications table...');
+
+      await pool.request().query(`
+        IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'bgv_verifications')
+        BEGIN
+            CREATE TABLE dbo.bgv_verifications (
+                id INT IDENTITY(1,1) PRIMARY KEY,
+                fresher_id INT NOT NULL,
+                hr_user_id INT NOT NULL,
+                document_type NVARCHAR(100) NOT NULL,
+                document_section NVARCHAR(200) NOT NULL,
+                status NVARCHAR(50) NOT NULL DEFAULT 'pending',
+                comments NVARCHAR(MAX),
+                verified_at DATETIME,
+                created_at DATETIME DEFAULT GETDATE(),
+                updated_at DATETIME DEFAULT GETDATE(),
+                
+                CONSTRAINT FK_bgv_verifications_fresher FOREIGN KEY (fresher_id) 
+                    REFERENCES dbo.freshers(id) ON DELETE CASCADE,
+                CONSTRAINT FK_bgv_verifications_hr_user FOREIGN KEY (hr_user_id) 
+                    REFERENCES dbo.hr_users(id),
+                CONSTRAINT CHK_verification_status CHECK (status IN ('pending', 'verified', 'rejected'))
+            );
+            
+            CREATE INDEX IX_bgv_verifications_fresher_id ON dbo.bgv_verifications(fresher_id);
+            CREATE INDEX IX_bgv_verifications_hr_user_id ON dbo.bgv_verifications(hr_user_id);
+            CREATE INDEX IX_bgv_verifications_status ON dbo.bgv_verifications(status);
+            CREATE INDEX IX_bgv_verifications_document_type ON dbo.bgv_verifications(document_type);
+            
+            PRINT 'Table bgv_verifications created successfully';
+        END
+      `);
+
+      console.log('✅ bgv_verifications table ready');
+    } catch (error) {
+      console.error('Error creating bgv_verifications table:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all submitted BGV forms for HR review
+   */
+  static async getSubmittedBGVFormsForHR(): Promise<any[]> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+
+      const result = await pool.request().query(`
+        SELECT 
+          bs.id as submission_id,
+          bs.fresher_id,
+          bs.submission_status,
+          bs.submitted_at,
+          bs.reviewed_at,
+          bs.reviewed_by,
+          f.first_name,
+          f.last_name,
+          f.email,
+          f.designation,
+          f.date_of_joining,
+          -- Count verifications
+          (SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id AND status = 'verified') as verified_count,
+          (SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id AND status = 'rejected') as rejected_count,
+          (SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id) as total_verifications
+        FROM bgv_submissions bs
+        INNER JOIN freshers f ON bs.fresher_id = f.id
+        WHERE bs.submission_status = 'submitted'
+        ORDER BY bs.submitted_at DESC
+      `);
+
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching submitted BGV forms:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get BGV verification status for a fresher
+   */
+  static async getBGVVerificationStatus(fresherId: number): Promise<any> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      // Get all verifications for this fresher
+      const result = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT 
+            v.id,
+            v.document_type,
+            v.document_section,
+            v.status,
+            v.comments,
+            v.verified_at,
+            v.created_at,
+            hr.first_name as hr_first_name,
+            hr.last_name as hr_last_name,
+            hr.email as hr_email
+          FROM bgv_verifications v
+          LEFT JOIN hr_users hr ON v.hr_user_id = hr.id
+          WHERE v.fresher_id = @fresherId
+          ORDER BY v.document_type, v.document_section
+        `);
+
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching BGV verification status:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save document verification by HR
+   */
+  static async saveDocumentVerification(
+    hrUserId: number,
+    fresherId: number,
+    documentType: string,
+    documentSection: string,
+    status: 'verified' | 'rejected',
+    comments?: string
+  ): Promise<void> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      console.log(`📝 Saving verification: HR ${hrUserId} ${status} ${documentType}.${documentSection} for fresher ${fresherId}`);
+
+      // Check if verification already exists
+      const existingResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .input('documentType', mssql.NVarChar(100), documentType)
+        .input('documentSection', mssql.NVarChar(200), documentSection)
+        .query(`
+          SELECT id FROM bgv_verifications 
+          WHERE fresher_id = @fresherId 
+            AND document_type = @documentType 
+            AND document_section = @documentSection
+        `);
+
+      if (existingResult.recordset.length > 0) {
+        // Update existing verification
+        await pool.request()
+          .input('id', mssql.Int, existingResult.recordset[0].id)
+          .input('hrUserId', mssql.Int, hrUserId)
+          .input('status', mssql.NVarChar(50), status)
+          .input('comments', mssql.NVarChar(mssql.MAX), comments || null)
+          .input('verifiedAt', mssql.DateTime, new Date())
+          .query(`
+            UPDATE bgv_verifications 
+            SET hr_user_id = @hrUserId,
+                status = @status,
+                comments = @comments,
+                verified_at = @verifiedAt,
+                updated_at = GETDATE()
+            WHERE id = @id
+          `);
+      } else {
+        // Insert new verification
+        await pool.request()
+          .input('fresherId', mssql.Int, fresherId)
+          .input('hrUserId', mssql.Int, hrUserId)
+          .input('documentType', mssql.NVarChar(100), documentType)
+          .input('documentSection', mssql.NVarChar(200), documentSection)
+          .input('status', mssql.NVarChar(50), status)
+          .input('comments', mssql.NVarChar(mssql.MAX), comments || null)
+          .input('verifiedAt', mssql.DateTime, new Date())
+          .query(`
+            INSERT INTO bgv_verifications 
+              (fresher_id, hr_user_id, document_type, document_section, status, comments, verified_at)
+            VALUES 
+              (@fresherId, @hrUserId, @documentType, @documentSection, @status, @comments, @verifiedAt)
+          `);
+      }
+
+      console.log(`✅ Verification saved: ${status}`);
+    } catch (error) {
+      console.error('Error saving document verification:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all document verifications for a fresher grouped by type
+   */
+  static async getAllDocumentVerifications(fresherId: number): Promise<any> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      const result = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT 
+            v.id,
+            v.document_type,
+            v.document_section,
+            v.status,
+            v.comments,
+            v.verified_at,
+            hr.first_name as hr_first_name,
+            hr.last_name as hr_last_name
+          FROM bgv_verifications v
+          LEFT JOIN hr_users hr ON v.hr_user_id = hr.id
+          WHERE v.fresher_id = @fresherId
+          ORDER BY v.document_type, v.document_section
+        `);
+
+      // Group by document type
+      const grouped: any = {};
+      result.recordset.forEach((record: any) => {
+        if (!grouped[record.document_type]) {
+          grouped[record.document_type] = [];
+        }
+        grouped[record.document_type].push(record);
+      });
+
+      return grouped;
+    } catch (error) {
+      console.error('Error fetching all document verifications:', error);
+      throw error;
     }
   }
 

@@ -28,6 +28,9 @@ router.post('/progress', bgvController.updateProgress.bind(bgvController));
 
 // HR BGV routes
 router.get('/hr/submissions', bgvController.getHRSubmissions.bind(bgvController));
+router.get('/hr/verification/:fresherId', bgvController.getVerificationStatus.bind(bgvController));
+router.post('/hr/verify', bgvController.saveVerification.bind(bgvController));
+router.post('/hr/send-email', bgvController.sendVerificationEmail.bind(bgvController));
 router.post('/hr/document/:documentId/verify', bgvController.verifyDocument.bind(bgvController));
 
 // Document download route
