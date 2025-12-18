@@ -78,7 +78,17 @@ export const Documents = () => {
       },
       sameAsCommAddress: false
     },
-    personal: {},
+    personal: {
+      maritalStatus: '',
+      noOfChildren: '',
+      fatherName: '',
+      fatherDob: '',
+      fatherDeceased: false,
+      motherName: '',
+      motherDob: '',
+      motherDeceased: false,
+      emergencyContacts: [{ name: '', mobile: '', relationship: '' }]
+    },
     education: {},
     employment: {},
     passport: {},
@@ -195,7 +205,34 @@ export const Documents = () => {
               }));
 
               console.log('✅ Form populated with saved data');
-            } else if (result.prefilledData) {
+            }
+
+            // Handle saved personal data
+            if (result.savedPersonal) {
+              const saved = result.savedPersonal;
+              console.log('📋 Saved personal found:', saved);
+
+              setFormData(prev => ({
+                ...prev,
+                personal: {
+                  maritalStatus: saved.marital_status || '',
+                  noOfChildren: saved.no_of_children || '',
+                  fatherName: saved.father_name || '',
+                  fatherDob: saved.father_dob ? new Date(saved.father_dob).toISOString().split('T')[0] : '',
+                  fatherDeceased: saved.father_deceased || false,
+                  motherName: saved.mother_name || '',
+                  motherDob: saved.mother_dob ? new Date(saved.mother_dob).toISOString().split('T')[0] : '',
+                  motherDeceased: saved.mother_deceased || false,
+                  emergencyContacts: saved.emergency_contacts && saved.emergency_contacts.length > 0 
+                    ? saved.emergency_contacts 
+                    : [{ name: '', mobile: '', relationship: '' }]
+                }
+              }));
+
+              console.log('✅ Form populated with saved personal data');
+            }
+
+            if (result.prefilledData && !result.savedDemographics) {
               // Only use prefilled data if no saved data exists
               const data = result.prefilledData;
               const autoFillValues = {
@@ -372,6 +409,117 @@ export const Documents = () => {
     setActiveSection(sectionIndex);
   };
 
+  // Validate personal section
+  const validatePersonalSection = () => {
+    const errors = [];
+
+    // Marital Status is required
+    if (!formData.personal.maritalStatus) {
+      errors.push('Marital Status is required');
+    }
+
+    // Father Name is required
+    if (!formData.personal.fatherName || !formData.personal.fatherName.trim()) {
+      errors.push("Father's Name is required");
+    }
+
+    // Mother Name is required
+    if (!formData.personal.motherName || !formData.personal.motherName.trim()) {
+      errors.push("Mother's Name is required");
+    }
+
+    // At least one emergency contact required
+    if (!formData.personal.emergencyContacts || formData.personal.emergencyContacts.length === 0) {
+      errors.push('At least one emergency contact is required');
+    } else {
+      // Validate each emergency contact
+      const validContacts = formData.personal.emergencyContacts.filter(
+        contact => contact.name.trim() && contact.mobile.trim() && contact.relationship
+      );
+      
+      if (validContacts.length === 0) {
+        errors.push('At least one complete emergency contact is required');
+      }
+
+      // Check for duplicate mobile numbers
+      const mobiles = formData.personal.emergencyContacts.map(c => c.mobile).filter(m => m.trim());
+      const uniqueMobiles = new Set(mobiles);
+      if (mobiles.length !== uniqueMobiles.size) {
+        errors.push('Duplicate mobile numbers are not allowed in emergency contacts');
+      }
+
+      // Validate mobile number length for each contact
+      formData.personal.emergencyContacts.forEach((contact, index) => {
+        if (contact.mobile && (contact.mobile.length < 10 || contact.mobile.length > 15)) {
+          errors.push(`Emergency contact ${index + 1}: Mobile number must be 10-15 digits`);
+        }
+      });
+    }
+
+    return errors;
+  };
+
+  // Save personal section
+  const handleSavePersonal = async () => {
+    const validationErrors = validatePersonalSection();
+    if (validationErrors.length > 0) {
+      alert('Please fix the following errors:\n\n' + validationErrors.join('\n'));
+      return;
+    }
+
+    setLoading(true);
+    try {
+      const token = localStorage.getItem('auth_token');
+      if (!token) {
+        throw new Error('Authentication token not found');
+      }
+
+      const dataToSave = {
+        marital_status: formData.personal.maritalStatus,
+        no_of_children: formData.personal.noOfChildren || 0,
+        father_name: formData.personal.fatherName,
+        father_dob: formData.personal.fatherDob || null,
+        father_deceased: formData.personal.fatherDeceased,
+        mother_name: formData.personal.motherName,
+        mother_dob: formData.personal.motherDob || null,
+        mother_deceased: formData.personal.motherDeceased,
+        emergency_contacts: formData.personal.emergencyContacts.filter(
+          contact => contact.name.trim() && contact.mobile.trim() && contact.relationship
+        )
+      };
+
+      const response = await fetch('http://localhost:3000/api/bgv/personal', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}`
+        },
+        body: JSON.stringify(dataToSave)
+      });
+
+      const result = await response.json();
+
+      if (result.success) {
+        alert('Personal information saved successfully!');
+      } else {
+        throw new Error(result.message || 'Failed to save personal information');
+      }
+    } catch (error) {
+      console.error('Error saving personal information:', error);
+      alert('Failed to save personal information. Please try again.');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Save and navigate to next section
+  const handleSaveAndNext = async () => {
+    await handleSavePersonal();
+    if (activeSection < sections.length - 1) {
+      setActiveSection(activeSection + 1);
+    }
+  };
+
   const handleSave = async () => {
     setLoading(true);
     try {
@@ -448,7 +596,17 @@ export const Documents = () => {
           break;
         case 'personal':
           apiEndpoint = '/api/bgv/personal';
-          dataToSave = formData.personal;
+          dataToSave = {
+            marital_status: formData.personal.maritalStatus,
+            no_of_children: formData.personal.noOfChildren || 0,
+            father_name: formData.personal.fatherName,
+            father_dob: formData.personal.fatherDob,
+            father_deceased: formData.personal.fatherDeceased,
+            mother_name: formData.personal.motherName,
+            mother_dob: formData.personal.motherDob,
+            mother_deceased: formData.personal.motherDeceased,
+            emergency_contacts: formData.personal.emergencyContacts
+          };
           break;
         case 'education':
           apiEndpoint = '/api/bgv/education';
@@ -1450,6 +1608,397 @@ export const Documents = () => {
             <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
               Complete your personal details and emergency contact information.
             </p>
+
+            {/* Personal Information Section */}
+            <div style={{ marginBottom: '30px' }}>
+              <h4 style={{ color: 'black', marginBottom: '15px', fontSize: '16px', fontWeight: '600' }}>Personal Details</h4>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '15px' }}>
+                {/* Marital Status */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', color: '#374151', fontSize: '14px', fontWeight: '500' }}>
+                    Marital Status <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <select
+                    value={formData.personal.maritalStatus}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setFormData(prev => ({
+                        ...prev,
+                        personal: {
+                          ...prev.personal,
+                          maritalStatus: value,
+                          noOfChildren: value !== 'Married' ? '' : prev.personal.noOfChildren
+                        }
+                      }));
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="">Select Marital Status</option>
+                    <option value="Single">Single</option>
+                    <option value="Married">Married</option>
+                    <option value="Divorced">Divorced</option>
+                    <option value="Widowed">Widowed</option>
+                  </select>
+                </div>
+
+                {/* Number of Children */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', color: '#374151', fontSize: '14px', fontWeight: '500' }}>
+                    Number of Children
+                  </label>
+                  <input
+                    type="number"
+                    min="0"
+                    disabled={formData.personal.maritalStatus !== 'Married'}
+                    value={formData.personal.noOfChildren}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        personal: { ...prev.personal, noOfChildren: e.target.value }
+                      }));
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: formData.personal.maritalStatus !== 'Married' ? '#f3f4f6' : 'white'
+                    }}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Father Details */}
+            <div style={{ marginBottom: '30px' }}>
+              <h4 style={{ color: 'black', marginBottom: '15px', fontSize: '16px', fontWeight: '600' }}>Father's Details</h4>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: '15px', alignItems: 'end' }}>
+                {/* Father Name */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', color: '#374151', fontSize: '14px', fontWeight: '500' }}>
+                    Father's Name <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.personal.fatherName}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                      setFormData(prev => ({
+                        ...prev,
+                        personal: { ...prev.personal, fatherName: value }
+                      }));
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                {/* Father DOB */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', color: '#374151', fontSize: '14px', fontWeight: '500' }}>
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    max={new Date().toISOString().split('T')[0]}
+                    disabled={formData.personal.fatherDeceased}
+                    value={formData.personal.fatherDob}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        personal: { ...prev.personal, fatherDob: e.target.value }
+                      }));
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: formData.personal.fatherDeceased ? '#f3f4f6' : 'white'
+                    }}
+                  />
+                </div>
+
+                {/* Father Deceased */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '10px' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.personal.fatherDeceased}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        personal: { 
+                          ...prev.personal, 
+                          fatherDeceased: e.target.checked,
+                          fatherDob: e.target.checked ? '' : prev.personal.fatherDob
+                        }
+                      }));
+                    }}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  <label style={{ fontSize: '14px', color: '#374151' }}>Deceased</label>
+                </div>
+              </div>
+            </div>
+
+            {/* Mother Details */}
+            <div style={{ marginBottom: '30px' }}>
+              <h4 style={{ color: 'black', marginBottom: '15px', fontSize: '16px', fontWeight: '600' }}>Mother's Details</h4>
+              
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 100px', gap: '15px', alignItems: 'end' }}>
+                {/* Mother Name */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', color: '#374151', fontSize: '14px', fontWeight: '500' }}>
+                    Mother's Name <span style={{ color: 'red' }}>*</span>
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.personal.motherName}
+                    onChange={(e) => {
+                      const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                      setFormData(prev => ({
+                        ...prev,
+                        personal: { ...prev.personal, motherName: value }
+                      }));
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                {/* Mother DOB */}
+                <div>
+                  <label style={{ display: 'block', marginBottom: '5px', color: '#374151', fontSize: '14px', fontWeight: '500' }}>
+                    Date of Birth
+                  </label>
+                  <input
+                    type="date"
+                    max={new Date().toISOString().split('T')[0]}
+                    disabled={formData.personal.motherDeceased}
+                    value={formData.personal.motherDob}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        personal: { ...prev.personal, motherDob: e.target.value }
+                      }));
+                    }}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '4px',
+                      fontSize: '14px',
+                      backgroundColor: formData.personal.motherDeceased ? '#f3f4f6' : 'white'
+                    }}
+                  />
+                </div>
+
+                {/* Mother Deceased */}
+                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingBottom: '10px' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.personal.motherDeceased}
+                    onChange={(e) => {
+                      setFormData(prev => ({
+                        ...prev,
+                        personal: { 
+                          ...prev.personal, 
+                          motherDeceased: e.target.checked,
+                          motherDob: e.target.checked ? '' : prev.personal.motherDob
+                        }
+                      }));
+                    }}
+                    style={{ width: '16px', height: '16px' }}
+                  />
+                  <label style={{ fontSize: '14px', color: '#374151' }}>Deceased</label>
+                </div>
+              </div>
+            </div>
+
+            {/* Emergency Contacts Section */}
+            <div style={{ marginBottom: '30px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h4 style={{ color: 'black', fontSize: '16px', fontWeight: '600' }}>Emergency Contacts</h4>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFormData(prev => ({
+                      ...prev,
+                      personal: {
+                        ...prev.personal,
+                        emergencyContacts: [
+                          ...prev.personal.emergencyContacts,
+                          { name: '', mobile: '', relationship: '' }
+                        ]
+                      }
+                    }));
+                  }}
+                  style={{
+                    padding: '8px 16px',
+                    backgroundColor: '#4f46e5',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '4px',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  + Add Contact
+                </button>
+              </div>
+
+              {/* Emergency Contacts Table */}
+              <div style={{ border: '1px solid #d1d5db', borderRadius: '4px', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f3f4f6' }}>
+                      <th style={{ padding: '12px', textAlign: 'left', color: '#374151', fontSize: '14px', fontWeight: '600' }}>
+                        Contact Person Name <span style={{ color: 'red' }}>*</span>
+                      </th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: '#374151', fontSize: '14px', fontWeight: '600' }}>
+                        Mobile Number <span style={{ color: 'red' }}>*</span>
+                      </th>
+                      <th style={{ padding: '12px', textAlign: 'left', color: '#374151', fontSize: '14px', fontWeight: '600' }}>
+                        Relationship <span style={{ color: 'red' }}>*</span>
+                      </th>
+                      <th style={{ padding: '12px', textAlign: 'center', color: '#374151', fontSize: '14px', fontWeight: '600', width: '80px' }}>
+                        Action
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.personal.emergencyContacts.map((contact, index) => (
+                      <tr key={index} style={{ borderTop: '1px solid #e5e7eb' }}>
+                        <td style={{ padding: '12px' }}>
+                          <input
+                            type="text"
+                            value={contact.name}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^a-zA-Z\s]/g, '');
+                              const newContacts = [...formData.personal.emergencyContacts];
+                              newContacts[index].name = value;
+                              setFormData(prev => ({
+                                ...prev,
+                                personal: { ...prev.personal, emergencyContacts: newContacts }
+                              }));
+                            }}
+                            placeholder="Enter name"
+                            style={{
+                              width: '100%',
+                              padding: '8px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              fontSize: '14px'
+                            }}
+                          />
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <input
+                            type="text"
+                            value={contact.mobile}
+                            onChange={(e) => {
+                              const value = e.target.value.replace(/[^0-9]/g, '').slice(0, 15);
+                              const newContacts = [...formData.personal.emergencyContacts];
+                              newContacts[index].mobile = value;
+                              setFormData(prev => ({
+                                ...prev,
+                                personal: { ...prev.personal, emergencyContacts: newContacts }
+                              }));
+                            }}
+                            placeholder="10-15 digits"
+                            style={{
+                              width: '100%',
+                              padding: '8px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              fontSize: '14px'
+                            }}
+                          />
+                          {contact.mobile && (contact.mobile.length < 10 || contact.mobile.length > 15) && (
+                            <span style={{ color: 'red', fontSize: '12px' }}>Must be 10-15 digits</span>
+                          )}
+                        </td>
+                        <td style={{ padding: '12px' }}>
+                          <select
+                            value={contact.relationship}
+                            onChange={(e) => {
+                              const newContacts = [...formData.personal.emergencyContacts];
+                              newContacts[index].relationship = e.target.value;
+                              setFormData(prev => ({
+                                ...prev,
+                                personal: { ...prev.personal, emergencyContacts: newContacts }
+                              }));
+                            }}
+                            style={{
+                              width: '100%',
+                              padding: '8px',
+                              border: '1px solid #d1d5db',
+                              borderRadius: '4px',
+                              fontSize: '14px'
+                            }}
+                          >
+                            <option value="">Select</option>
+                            <option value="Father">Father</option>
+                            <option value="Mother">Mother</option>
+                            <option value="Spouse">Spouse</option>
+                            <option value="Sibling">Sibling</option>
+                            <option value="Relative">Relative</option>
+                            <option value="Friend">Friend</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </td>
+                        <td style={{ padding: '12px', textAlign: 'center' }}>
+                          {formData.personal.emergencyContacts.length > 1 && (
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const newContacts = formData.personal.emergencyContacts.filter((_, i) => i !== index);
+                                setFormData(prev => ({
+                                  ...prev,
+                                  personal: { ...prev.personal, emergencyContacts: newContacts }
+                                }));
+                              }}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Delete
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
           </div>
         );
 

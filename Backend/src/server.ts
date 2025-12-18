@@ -58,6 +58,7 @@ async function startServer() {
       try {
         const { BGVService } = await import('./services/bgv.service');
         await BGVService.initializeBGVTables();
+        await BGVService.updatePersonalTableSchema();
         console.log('✅ BGV service initialized successfully');
       } catch (bgvError) {
         console.error('⚠️ BGV service initialization failed:', bgvError);

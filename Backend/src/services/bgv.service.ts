@@ -34,6 +34,24 @@ function convertFileDataToBuffer(fileData?: string): Buffer | null {
   }
 }
 
+interface EmergencyContact {
+  name: string;
+  mobile: string;
+  relationship: string;
+}
+
+interface Personal {
+  marital_status: string;
+  no_of_children?: number;
+  father_name: string;
+  father_dob?: Date;
+  father_deceased?: boolean;
+  mother_name: string;
+  mother_dob?: Date;
+  mother_deceased?: boolean;
+  emergency_contacts: EmergencyContact[];
+}
+
 interface Demographics {
   salutation?: string;
   first_name: string;
@@ -750,6 +768,157 @@ export class BGVService {
       console.log(`✅ Demographics saved for submission ${submissionId}`);
     } catch (error) {
       console.error('Error saving demographics:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update bgv_personal table to support multiple emergency contacts
+   */
+  static async updatePersonalTableSchema(): Promise<void> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+
+      const alterStatements = [
+        "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('bgv_personal') AND name = 'emergency_contacts') ALTER TABLE bgv_personal ADD emergency_contacts NVARCHAR(MAX)"
+      ];
+      
+      for (const statement of alterStatements) {
+        try {
+          await pool.request().query(statement);
+        } catch (error: any) {
+          if (!error.message.includes('already exists')) {
+            console.error('❌ Error updating bgv_personal schema:', error.message);
+          }
+        }
+      }
+      
+      console.log('✅ bgv_personal table schema updated');
+    } catch (error) {
+      console.error('❌ Error updating bgv_personal table schema:', error);
+    }
+  }
+
+  /**
+   * Get saved personal information
+   */
+  static async getSavedPersonal(submissionId: number): Promise<any> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      const result = await pool.request()
+        .input('submissionId', mssql.Int, submissionId)
+        .query(`
+          SELECT 
+            marital_status, num_children as no_of_children,
+            father_name, father_dob, father_deceased,
+            mother_name, mother_dob, mother_deceased,
+            emergency_contacts
+          FROM bgv_personal 
+          WHERE submission_id = @submissionId
+        `);
+
+      if (result.recordset.length > 0) {
+        const data = result.recordset[0];
+        // Parse emergency contacts JSON if it exists
+        if (data.emergency_contacts) {
+          try {
+            data.emergency_contacts = JSON.parse(data.emergency_contacts);
+          } catch (e) {
+            data.emergency_contacts = [];
+          }
+        } else {
+          data.emergency_contacts = [];
+        }
+        return data;
+      }
+      return null;
+    } catch (error) {
+      console.error('Error getting saved personal information:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save personal information
+   */
+  static async savePersonal(submissionId: number, data: Personal): Promise<void> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      console.log('🔍 Received personal data:', data);
+
+      // Convert emergency contacts array to JSON string
+      const emergencyContactsJson = JSON.stringify(data.emergency_contacts || []);
+
+      // Check if personal info exists
+      const existingResult = await pool.request()
+        .input('submissionId', mssql.Int, submissionId)
+        .query('SELECT id FROM bgv_personal WHERE submission_id = @submissionId');
+
+      if (existingResult.recordset.length > 0) {
+        // Update existing
+        await pool.request()
+          .input('submissionId', mssql.Int, submissionId)
+          .input('maritalStatus', mssql.NVarChar(20), data.marital_status)
+          .input('numChildren', mssql.Int, data.no_of_children || 0)
+          .input('fatherName', mssql.NVarChar(100), data.father_name)
+          .input('fatherDob', mssql.Date, data.father_dob)
+          .input('fatherDeceased', mssql.Bit, data.father_deceased || false)
+          .input('motherName', mssql.NVarChar(100), data.mother_name)
+          .input('motherDob', mssql.Date, data.mother_dob)
+          .input('motherDeceased', mssql.Bit, data.mother_deceased || false)
+          .input('emergencyContacts', mssql.NVarChar(mssql.MAX), emergencyContactsJson)
+          .query(`
+            UPDATE bgv_personal SET
+              marital_status = @maritalStatus,
+              num_children = @numChildren,
+              father_name = @fatherName,
+              father_dob = @fatherDob,
+              father_deceased = @fatherDeceased,
+              mother_name = @motherName,
+              mother_dob = @motherDob,
+              mother_deceased = @motherDeceased,
+              emergency_contacts = @emergencyContacts,
+              updated_at = GETUTCDATE()
+            WHERE submission_id = @submissionId
+          `);
+      } else {
+        // Insert new
+        await pool.request()
+          .input('submissionId', mssql.Int, submissionId)
+          .input('maritalStatus', mssql.NVarChar(20), data.marital_status)
+          .input('numChildren', mssql.Int, data.no_of_children || 0)
+          .input('fatherName', mssql.NVarChar(100), data.father_name)
+          .input('fatherDob', mssql.Date, data.father_dob)
+          .input('fatherDeceased', mssql.Bit, data.father_deceased || false)
+          .input('motherName', mssql.NVarChar(100), data.mother_name)
+          .input('motherDob', mssql.Date, data.mother_dob)
+          .input('motherDeceased', mssql.Bit, data.mother_deceased || false)
+          .input('emergencyContacts', mssql.NVarChar(mssql.MAX), emergencyContactsJson)
+          .query(`
+            INSERT INTO bgv_personal (
+              submission_id, marital_status, num_children,
+              father_name, father_dob, father_deceased,
+              mother_name, mother_dob, mother_deceased,
+              emergency_contacts
+            ) VALUES (
+              @submissionId, @maritalStatus, @numChildren,
+              @fatherName, @fatherDob, @fatherDeceased,
+              @motherName, @motherDob, @motherDeceased,
+              @emergencyContacts
+            )
+          `);
+      }
+
+      console.log(`✅ Personal information saved for submission ${submissionId}`);
+    } catch (error) {
+      console.error('Error saving personal information:', error);
       throw error;
     }
   }

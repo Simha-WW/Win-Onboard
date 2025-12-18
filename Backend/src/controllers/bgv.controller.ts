@@ -103,12 +103,14 @@ export class BGVController {
       const submission = await BGVService.getOrCreateSubmission(userId);
       const prefilledData = await BGVService.getFresherDataForDemographics(userId);
       const savedDemographics = await BGVService.getSavedDemographics(submission.id);
+      const savedPersonal = await BGVService.getSavedPersonal(submission.id);
 
       res.json({
         success: true,
         submission,
         prefilledData,
-        savedDemographics
+        savedDemographics,
+        savedPersonal
       });
     } catch (error) {
       console.error('Error getting BGV submission:', error);
@@ -172,7 +174,7 @@ export class BGVController {
       }
 
       const submission = await BGVService.getOrCreateSubmission(userId);
-      // TODO: Implement savePersonalInfo in BGVService
+      await BGVService.savePersonal(submission.id, req.body);
       
       res.json({
         success: true,
