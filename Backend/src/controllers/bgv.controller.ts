@@ -103,7 +103,14 @@ export class BGVController {
       const submission = await BGVService.getOrCreateSubmission(userId);
       const prefilledData = await BGVService.getFresherDataForDemographics(userId);
       const savedDemographics = await BGVService.getSavedDemographics(submission.id);
-      const savedPersonal = await BGVService.getSavedPersonal(submission.id);
+      
+      let savedPersonal = null;
+      try {
+        savedPersonal = await BGVService.getSavedPersonal(submission.id);
+      } catch (personalError) {
+        console.error('⚠️ Error loading personal data (table may need schema update):', personalError);
+        // Continue without personal data if table doesn't have correct schema yet
+      }
 
       res.json({
         success: true,

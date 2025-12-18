@@ -211,6 +211,7 @@ export const Documents = () => {
             if (result.savedPersonal) {
               const saved = result.savedPersonal;
               console.log('📋 Saved personal found:', saved);
+              console.log('📋 Emergency contacts from DB:', saved.emergency_contacts);
 
               setFormData(prev => ({
                 ...prev,
@@ -230,6 +231,7 @@ export const Documents = () => {
               }));
 
               console.log('✅ Form populated with saved personal data');
+              console.log('✅ Emergency contacts loaded:', saved.emergency_contacts);
             }
 
             if (result.prefilledData && !result.savedDemographics) {
@@ -514,6 +516,12 @@ export const Documents = () => {
 
   // Save and navigate to next section
   const handleSaveAndNext = async () => {
+    const validationErrors = validatePersonalSection();
+    if (validationErrors.length > 0) {
+      alert('Please complete all required fields before proceeding:\n\n' + validationErrors.join('\n'));
+      return;
+    }
+    
     await handleSavePersonal();
     if (activeSection < sections.length - 1) {
       setActiveSection(activeSection + 1);
@@ -681,6 +689,17 @@ export const Documents = () => {
   };
 
   const handleNext = async () => {
+    // Validate current section before navigating
+    const section = sections[activeSection];
+    
+    if (section.id === 'personal') {
+      const validationErrors = validatePersonalSection();
+      if (validationErrors.length > 0) {
+        alert('Please complete all required fields before proceeding:\n\n' + validationErrors.join('\n'));
+        return;
+      }
+    }
+    
     await handleSave();
     if (activeSection < sections.length - 1) {
       setActiveSection(activeSection + 1);

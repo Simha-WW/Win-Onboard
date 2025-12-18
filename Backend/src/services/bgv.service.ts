@@ -780,21 +780,70 @@ export class BGVService {
       const { getMSSQLPool } = await import('../config/database');
       const pool = getMSSQLPool();
 
-      const alterStatements = [
-        "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('bgv_personal') AND name = 'emergency_contacts') ALTER TABLE bgv_personal ADD emergency_contacts NVARCHAR(MAX)"
-      ];
-      
-      for (const statement of alterStatements) {
+      // Check and add num_children column
+      try {
+        console.log('🔧 Checking if num_children column exists...');
+        const checkNumChildren = await pool.request().query(`
+          SELECT COUNT(*) as col_count 
+          FROM sys.columns 
+          WHERE object_id = OBJECT_ID('bgv_personal') AND name = 'num_children'
+        `);
+        
+        if (checkNumChildren.recordset[0].col_count === 0) {
+          console.log('🔧 Adding num_children column...');
+          await pool.request().query('ALTER TABLE bgv_personal ADD num_children INT DEFAULT 0');
+          console.log('✅ num_children column added successfully');
+        } else {
+          console.log('✅ num_children column already exists');
+        }
+      } catch (error: any) {
+        console.error('❌ Error adding num_children column:', error.message);
+      }
+
+      // Check and add emergency_contacts column
+      try {
+        console.log('🔧 Checking if emergency_contacts column exists...');
+        const checkEmergencyContacts = await pool.request().query(`
+          SELECT COUNT(*) as col_count 
+          FROM sys.columns 
+          WHERE object_id = OBJECT_ID('bgv_personal') AND name = 'emergency_contacts'
+        `);
+        
+        if (checkEmergencyContacts.recordset[0].col_count === 0) {
+          console.log('🔧 Adding emergency_contacts column...');
+          await pool.request().query('ALTER TABLE bgv_personal ADD emergency_contacts NVARCHAR(MAX)');
+          console.log('✅ emergency_contacts column added successfully');
+        } else {
+          console.log('✅ emergency_contacts column already exists');
+        }
+      } catch (error: any) {
+        console.error('❌ Error adding emergency_contacts column:', error.message);
+      }
+
+      // Drop old single emergency contact columns (we now use JSON array for multiple contacts)
+      const oldColumns = ['emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'];
+      for (const columnName of oldColumns) {
         try {
-          await pool.request().query(statement);
-        } catch (error: any) {
-          if (!error.message.includes('already exists')) {
-            console.error('❌ Error updating bgv_personal schema:', error.message);
+          console.log(`🔧 Checking if old column ${columnName} exists...`);
+          const checkColumn = await pool.request().query(`
+            SELECT COUNT(*) as col_count 
+            FROM sys.columns 
+            WHERE object_id = OBJECT_ID('bgv_personal') AND name = '${columnName}'
+          `);
+          
+          if (checkColumn.recordset[0].col_count > 0) {
+            console.log(`🔧 Dropping old column ${columnName}...`);
+            await pool.request().query(`ALTER TABLE bgv_personal DROP COLUMN ${columnName}`);
+            console.log(`✅ Old column ${columnName} dropped successfully`);
+          } else {
+            console.log(`✅ Old column ${columnName} does not exist (already removed)`);
           }
+        } catch (error: any) {
+          console.error(`❌ Error dropping old column ${columnName}:`, error.message);
         }
       }
       
-      console.log('✅ bgv_personal table schema updated');
+      console.log('✅ bgv_personal table schema update completed');
     } catch (error) {
       console.error('❌ Error updating bgv_personal table schema:', error);
     }
@@ -813,7 +862,7 @@ export class BGVService {
         .input('submissionId', mssql.Int, submissionId)
         .query(`
           SELECT 
-            marital_status, num_children as no_of_children,
+            marital_status, num_children,
             father_name, father_dob, father_deceased,
             mother_name, mother_dob, mother_deceased,
             emergency_contacts
@@ -823,11 +872,16 @@ export class BGVService {
 
       if (result.recordset.length > 0) {
         const data = result.recordset[0];
+        console.log('🔍 Raw personal data from DB:', data);
+        console.log('🔍 Raw emergency_contacts from DB:', data.emergency_contacts);
+        
         // Parse emergency contacts JSON if it exists
         if (data.emergency_contacts) {
           try {
             data.emergency_contacts = JSON.parse(data.emergency_contacts);
+            console.log('✅ Parsed emergency_contacts:', data.emergency_contacts);
           } catch (e) {
+            console.error('❌ Error parsing emergency_contacts:', e);
             data.emergency_contacts = [];
           }
         } else {
@@ -852,9 +906,11 @@ export class BGVService {
       const mssql = await import('mssql');
 
       console.log('🔍 Received personal data:', data);
+      console.log('🔍 Emergency contacts to save:', data.emergency_contacts);
 
       // Convert emergency contacts array to JSON string
       const emergencyContactsJson = JSON.stringify(data.emergency_contacts || []);
+      console.log('🔍 Emergency contacts JSON string:', emergencyContactsJson);
 
       // Check if personal info exists
       const existingResult = await pool.request()
