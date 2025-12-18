@@ -537,6 +537,40 @@ export class BGVService {
   }
 
   /**
+   * Get saved demographics data for a submission
+   */
+  static async getSavedDemographics(submissionId: number): Promise<any> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      const result = await pool.request()
+        .input('submissionId', mssql.Int, submissionId)
+        .query(`
+          SELECT 
+            salutation, first_name, middle_name, last_name, name_for_records,
+            dob_as_per_records, celebrated_dob, gender, blood_group, 
+            whatsapp_number, linkedin_url, aadhaar_card_number, pan_card_number,
+            comm_house_number, comm_street_name, comm_city, comm_district, 
+            comm_state, comm_country, comm_pin_code, perm_same_as_comm,
+            perm_house_number, perm_street_name, perm_city, perm_district,
+            perm_state, perm_country, perm_pin_code,
+            aadhaar_file_name, aadhaar_file_type, aadhaar_file_size,
+            pan_file_name, pan_file_type, pan_file_size,
+            resume_file_name, resume_file_type, resume_file_size
+          FROM bgv_demographics 
+          WHERE submission_id = @submissionId
+        `);
+
+      return result.recordset.length > 0 ? result.recordset[0] : null;
+    } catch (error) {
+      console.error('Error getting saved demographics:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Save demographics data
    */
   static async saveDemographics(submissionId: number, data: Demographics): Promise<void> {

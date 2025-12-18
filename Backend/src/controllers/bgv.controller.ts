@@ -102,11 +102,13 @@ export class BGVController {
 
       const submission = await BGVService.getOrCreateSubmission(userId);
       const prefilledData = await BGVService.getFresherDataForDemographics(userId);
+      const savedDemographics = await BGVService.getSavedDemographics(submission.id);
 
       res.json({
         success: true,
         submission,
-        prefilledData
+        prefilledData,
+        savedDemographics
       });
     } catch (error) {
       console.error('Error getting BGV submission:', error);

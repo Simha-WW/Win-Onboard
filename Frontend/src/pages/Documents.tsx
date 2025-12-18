@@ -92,7 +92,7 @@ export const Documents = () => {
 
   // Fetch user details on component mount
   useEffect(() => {
-    const fetchFresherDetails = async () => {
+    const fetchBGVData = async () => {
       try {
         const token = localStorage.getItem('auth_token');
         console.log('🔑 Auth token found:', token ? `Yes (${token.substring(0, 20)}...)` : 'No');
@@ -103,9 +103,9 @@ export const Documents = () => {
           return;
         }
 
-        console.log('📡 Making API call to /api/bgv/fresher-details...');
+        console.log('📡 Making API call to /api/bgv/submission...');
         
-        const response = await fetch('/api/bgv/fresher-details', {
+        const response = await fetch('/api/bgv/submission', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -118,40 +118,101 @@ export const Documents = () => {
 
         if (response.ok) {
           const result = await response.json();
-          console.log('📋 Full API response:', result);
+          console.log('📋 Full BGV API response:', result);
           
-          if (result.success && result.data) {
-            const data = result.data;
-            console.log('✅ Fresher details:', data);
-            
-            // Set the prefilled data state
-            setPrefilledData(data);
+          if (result.success) {
+            // Handle prefilled data from user profile
+            if (result.prefilledData) {
+              const data = result.prefilledData;
+              console.log('✅ Prefilled data:', data);
+              setPrefilledData(data);
+            }
 
-            // Prepare auto-fill values
-            const autoFillValues = {
-              firstName: data.firstName || '',
-              lastName: data.lastName || '',
-              nameForRecords: data.firstName && data.lastName ? `${data.firstName} ${data.lastName}` : '',
-              dobAsPerRecords: data.dateOfBirth ? new Date(data.dateOfBirth).toISOString().split('T')[0] : '',
-              whatsappNumber: data.phoneNumber || ''
-            };
+            // Handle saved BGV demographics data
+            if (result.savedDemographics) {
+              const saved = result.savedDemographics;
+              console.log('📋 Saved demographics found:', saved);
+              
+              // Map the saved data to form structure
+              const savedFormData = {
+                salutation: saved.salutation || '',
+                firstName: saved.first_name || '',
+                middleName: saved.middle_name || '',
+                lastName: saved.last_name || '',
+                nameForRecords: saved.name_for_records || '',
+                dobAsPerRecords: saved.dob_as_per_records ? new Date(saved.dob_as_per_records).toISOString().split('T')[0] : '',
+                celebratedDob: saved.celebrated_dob ? new Date(saved.celebrated_dob).toISOString().split('T')[0] : '',
+                gender: saved.gender || '',
+                bloodGroup: saved.blood_group || '',
+                whatsappNumber: saved.whatsapp_number || '',
+                linkedinUrl: saved.linkedin_url || '',
+                aadhaarNumber: saved.aadhaar_card_number || '',
+                panNumber: saved.pan_card_number || '',
+                // File upload information (create file-like objects to show upload status)
+                aadhaarFile: saved.aadhaar_file_name ? { 
+                  name: saved.aadhaar_file_name, 
+                  type: saved.aadhaar_file_type, 
+                  size: saved.aadhaar_file_size,
+                  uploaded: true 
+                } : null,
+                panFile: saved.pan_file_name ? { 
+                  name: saved.pan_file_name, 
+                  type: saved.pan_file_type, 
+                  size: saved.pan_file_size,
+                  uploaded: true 
+                } : null,
+                resumeFile: saved.resume_file_name ? { 
+                  name: saved.resume_file_name, 
+                  type: saved.resume_file_type, 
+                  size: saved.resume_file_size,
+                  uploaded: true 
+                } : null,
+                // Address Information (matching the form structure)
+                communicationAddress: {
+                  houseNo: saved.comm_house_number || '',
+                  streetName: saved.comm_street_name || '',
+                  city: saved.comm_city || '',
+                  district: saved.comm_district || '',
+                  state: saved.comm_state || ''
+                },
+                permanentAddress: {
+                  houseNo: saved.perm_house_number || '',
+                  streetName: saved.perm_street_name || '',
+                  city: saved.perm_city || '',
+                  district: saved.perm_district || '',
+                  state: saved.perm_state || ''
+                },
+                sameAsCommAddress: saved.perm_same_as_comm || false
+              };
 
-            console.log('🔄 Auto-fill values:', autoFillValues);
+              // Update form data with saved data
+              setFormData(prev => ({
+                ...prev,
+                demographics: {
+                  ...prev.demographics,
+                  ...savedFormData
+                }
+              }));
 
-            // Update form data
-            setFormData(prev => ({
-              ...prev,
-              demographics: {
-                ...prev.demographics,
-                ...autoFillValues
-              }
-            }));
+              console.log('✅ Form populated with saved data');
+            } else if (result.prefilledData) {
+              // Only use prefilled data if no saved data exists
+              const data = result.prefilledData;
+              const autoFillValues = {
+                firstName: data.first_name || '',
+                lastName: data.last_name || '',
+                nameForRecords: data.first_name && data.last_name ? `${data.first_name} ${data.last_name}` : ''
+              };
 
-            console.log('🎉 Auto-fill completed!');
-            
-            // Show success message
-            if (data.firstName || data.lastName) {
-              console.log(`👤 Welcome back, ${data.firstName} ${data.lastName}! Your details have been auto-filled.`);
+              setFormData(prev => ({
+                ...prev,
+                demographics: {
+                  ...prev.demographics,
+                  ...autoFillValues
+                }
+              }));
+
+              console.log('✅ Form populated with prefilled data');
             }
           } else {
             console.error('❌ API response not successful:', result);
@@ -161,43 +222,12 @@ export const Documents = () => {
           console.error('❌ API request failed:', response.status, response.statusText, errorText);
         }
       } catch (error) {
-        console.error('Error fetching fresher details:', error);
+        console.error('Error fetching BGV data:', error);
       }
     };
 
-    fetchFresherDetails();
+    fetchBGVData();
   }, []);
-
-  // Auto-save effect - saves data when form changes (with debouncing)
-  useEffect(() => {
-    const autoSaveTimeout = setTimeout(() => {
-      // Only auto-save if there's meaningful data and user is authenticated
-      const token = localStorage.getItem('auth_token');
-      const section = sections[activeSection];
-      
-      if (!token || !section || loading) return;
-
-      // Check if current section has any filled data
-      let hasData = false;
-      
-      if (section.id === 'demographics') {
-        const demo = formData.demographics;
-        hasData = demo.firstName || demo.lastName || demo.salutation || 
-                  demo.middleName || demo.gender || demo.bloodGroup ||
-                  demo.whatsappNumber || demo.linkedinUrl || 
-                  demo.aadhaarNumber || demo.panNumber ||
-                  demo.currentAddress.houseNumber || demo.currentAddress.streetName ||
-                  demo.currentAddress.city || demo.currentAddress.state;
-      }
-
-      if (hasData) {
-        console.log('💾 Auto-saving section:', section.id);
-        handleSave();
-      }
-    }, 3000); // Auto-save after 3 seconds of inactivity
-
-    return () => clearTimeout(autoSaveTimeout);
-  }, [formData, activeSection]); // Dependencies: form data and active section
 
   // Validation functions
   const validateField = (fieldName: string, value: any, formSection: string = 'demographics') => {
@@ -391,8 +421,8 @@ export const Documents = () => {
             perm_pin_code: formData.demographics.permanentAddress?.pinCode || ''
           };
           
-          // Handle file uploads by converting to base64
-          if (formData.demographics.aadhaarFile) {
+          // Handle file uploads by converting to base64 (only for new uploads, not previously uploaded files)
+          if (formData.demographics.aadhaarFile && !formData.demographics.aadhaarFile.uploaded) {
             const aadhaarBase64 = await fileToBase64(formData.demographics.aadhaarFile);
             dataToSave.aadhaar_file_data = aadhaarBase64;
             dataToSave.aadhaar_file_name = formData.demographics.aadhaarFile.name;
@@ -400,7 +430,7 @@ export const Documents = () => {
             dataToSave.aadhaar_file_size = formData.demographics.aadhaarFile.size;
           }
           
-          if (formData.demographics.panFile) {
+          if (formData.demographics.panFile && !formData.demographics.panFile.uploaded) {
             const panBase64 = await fileToBase64(formData.demographics.panFile);
             dataToSave.pan_file_data = panBase64;
             dataToSave.pan_file_name = formData.demographics.panFile.name;
@@ -408,7 +438,7 @@ export const Documents = () => {
             dataToSave.pan_file_size = formData.demographics.panFile.size;
           }
           
-          if (formData.demographics.resumeFile) {
+          if (formData.demographics.resumeFile && !formData.demographics.resumeFile.uploaded) {
             const resumeBase64 = await fileToBase64(formData.demographics.resumeFile);
             dataToSave.resume_file_data = resumeBase64;
             dataToSave.resume_file_name = formData.demographics.resumeFile.name;
@@ -961,19 +991,50 @@ export const Documents = () => {
                     <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
                       Aadhaar File *
                     </label>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileUpload('aadhaarFile', e.target.files?.[0] || null)}
-                      style={{
-                        width: '100%',
+                    {formData.demographics.aadhaarFile && formData.demographics.aadhaarFile.uploaded ? (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
                         padding: '10px',
-                        border: `1px solid ${errors['demographics.aadhaarFile'] ? '#ef4444' : '#d1d5db'}`,
+                        border: '1px solid #d1d5db',
                         borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                    {formData.demographics.aadhaarFile && (
+                        backgroundColor: '#f9fafb'
+                      }}>
+                        <span style={{ flex: 1, fontSize: '14px', color: '#374151' }}>
+                          📄 {formData.demographics.aadhaarFile.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleFileUpload('aadhaarFile', null)}
+                          style={{
+                            marginLeft: '10px',
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            color: '#3b82f6',
+                            backgroundColor: 'transparent',
+                            border: '1px solid #3b82f6',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : (
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => handleFileUpload('aadhaarFile', e.target.files?.[0] || null)}
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          border: `1px solid ${errors['demographics.aadhaarFile'] ? '#ef4444' : '#d1d5db'}`,
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    )}
+                    {formData.demographics.aadhaarFile && !formData.demographics.aadhaarFile.uploaded && (
                       <span style={{ color: '#059669', fontSize: '12px', marginTop: '4px', display: 'block' }}>
                         ✓ {formData.demographics.aadhaarFile.name}
                       </span>
@@ -1022,19 +1083,50 @@ export const Documents = () => {
                     <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
                       PAN File *
                     </label>
-                    <input
-                      type="file"
-                      accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => handleFileUpload('panFile', e.target.files?.[0] || null)}
-                      style={{
-                        width: '100%',
+                    {formData.demographics.panFile && formData.demographics.panFile.uploaded ? (
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
                         padding: '10px',
-                        border: `1px solid ${errors['demographics.panFile'] ? '#ef4444' : '#d1d5db'}`,
+                        border: '1px solid #d1d5db',
                         borderRadius: '8px',
-                        fontSize: '14px'
-                      }}
-                    />
-                    {formData.demographics.panFile && (
+                        backgroundColor: '#f9fafb'
+                      }}>
+                        <span style={{ flex: 1, fontSize: '14px', color: '#374151' }}>
+                          📄 {formData.demographics.panFile.name}
+                        </span>
+                        <button
+                          type="button"
+                          onClick={() => handleFileUpload('panFile', null)}
+                          style={{
+                            marginLeft: '10px',
+                            padding: '4px 8px',
+                            fontSize: '12px',
+                            color: '#3b82f6',
+                            backgroundColor: 'transparent',
+                            border: '1px solid #3b82f6',
+                            borderRadius: '4px',
+                            cursor: 'pointer'
+                          }}
+                        >
+                          Change
+                        </button>
+                      </div>
+                    ) : (
+                      <input
+                        type="file"
+                        accept=".pdf,.jpg,.jpeg,.png"
+                        onChange={(e) => handleFileUpload('panFile', e.target.files?.[0] || null)}
+                        style={{
+                          width: '100%',
+                          padding: '10px',
+                          border: `1px solid ${errors['demographics.panFile'] ? '#ef4444' : '#d1d5db'}`,
+                          borderRadius: '8px',
+                          fontSize: '14px'
+                        }}
+                      />
+                    )}
+                    {formData.demographics.panFile && !formData.demographics.panFile.uploaded && (
                       <span style={{ color: '#059669', fontSize: '12px', marginTop: '4px', display: 'block' }}>
                         ✓ {formData.demographics.panFile.name}
                       </span>
@@ -1057,23 +1149,55 @@ export const Documents = () => {
                   <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
                     Resume File *
                   </label>
-                  <input
-                    type="file"
-                    accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => handleFileUpload('resumeFile', e.target.files?.[0] || null)}
-                    style={{
-                      width: '100%',
-                      maxWidth: '400px',
+                  {formData.demographics.resumeFile && formData.demographics.resumeFile.uploaded ? (
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
                       padding: '10px',
-                      border: `1px solid ${errors['demographics.resumeFile'] ? '#ef4444' : '#d1d5db'}`,
+                      border: '1px solid #d1d5db',
                       borderRadius: '8px',
-                      fontSize: '14px'
-                    }}
-                  />
+                      backgroundColor: '#f9fafb',
+                      maxWidth: '400px'
+                    }}>
+                      <span style={{ flex: 1, fontSize: '14px', color: '#374151' }}>
+                        📄 {formData.demographics.resumeFile.name}
+                      </span>
+                      <button
+                        type="button"
+                        onClick={() => handleFileUpload('resumeFile', null)}
+                        style={{
+                          marginLeft: '10px',
+                          padding: '4px 8px',
+                          fontSize: '12px',
+                          color: '#3b82f6',
+                          backgroundColor: 'transparent',
+                          border: '1px solid #3b82f6',
+                          borderRadius: '4px',
+                          cursor: 'pointer'
+                        }}
+                      >
+                        Change
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => handleFileUpload('resumeFile', e.target.files?.[0] || null)}
+                      style={{
+                        width: '100%',
+                        maxWidth: '400px',
+                        padding: '10px',
+                        border: `1px solid ${errors['demographics.resumeFile'] ? '#ef4444' : '#d1d5db'}`,
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  )}
                   <p style={{ color: '#6b7280', fontSize: '12px', marginTop: '4px' }}>
                     Max file size: 10MB. Allowed formats: PDF, JPG, JPEG, PNG
                   </p>
-                  {formData.demographics.resumeFile && (
+                  {formData.demographics.resumeFile && !formData.demographics.resumeFile.uploaded && (
                     <span style={{ color: '#059669', fontSize: '12px', marginTop: '4px', display: 'block' }}>
                       ✓ {formData.demographics.resumeFile.name}
                     </span>
