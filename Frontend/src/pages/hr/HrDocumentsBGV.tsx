@@ -1,585 +1,433 @@
 /**
- * HR Documents & Background Verification - Manage document collection and verification
+ * HR Documents & Background Verification
+ * View and verify submitted BGV forms from freshers
  */
 
-import React, { useState } from 'react';
-import { 
-  FiFileText, 
-  FiDownload, 
-  FiUpload, 
-  FiCheckCircle, 
-  FiClock, 
-  FiAlertTriangle,
-  FiEye,
-  FiX
+import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
+import {
+  FiFileText,
+  FiCheckCircle,
+  FiClock,
+  FiX,
+  FiArrowRight,
+  FiUser,
+  FiCalendar,
+  FiBriefcase
 } from 'react-icons/fi';
+import { API_BASE_URL } from '../../config';
+
+interface BGVSubmission {
+  submission_id: number;
+  fresher_id: number;
+  submission_status: string;
+  submitted_at: string;
+  reviewed_at?: string;
+  reviewed_by?: string;
+  first_name: string;
+  last_name: string;
+  email: string;
+  designation: string;
+  date_of_joining: string;
+  verified_count: number;
+  rejected_count: number;
+  total_verifications: number;
+}
 
 export const HrDocumentsBGV = () => {
-  console.log('HR Documents & BGV rendering...');
-  
-  const [selectedCandidate, setSelectedCandidate] = useState<string>('all');
+  const navigate = useNavigate();
+  const [submissions, setSubmissions] = useState<BGVSubmission[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [filter, setFilter] = useState<string>('all');
 
-  // Mock documents data - TODO: Replace with API data
-  const candidatesDocuments = [
-    {
-      id: 1,
-      candidateName: 'John Smith',
-      position: 'Software Engineer',
-      documents: [
-        {
-          id: 1,
-          type: 'ID Proof',
-          name: 'Passport_John_Smith.pdf',
-          status: 'verified',
-          uploadedDate: '2024-01-08',
-          verifiedDate: '2024-01-09',
-          size: '2.3 MB'
-        },
-        {
-          id: 2,
-          type: 'Educational Certificate',
-          name: 'BS_Computer_Science.pdf',
-          status: 'verified',
-          uploadedDate: '2024-01-08',
-          verifiedDate: '2024-01-10',
-          size: '1.8 MB'
-        },
-        {
-          id: 3,
-          type: 'Experience Letter',
-          name: 'Previous_Company_Letter.pdf',
-          status: 'pending',
-          uploadedDate: '2024-01-09',
-          verifiedDate: null,
-          size: '1.2 MB'
-        },
-        {
-          id: 4,
-          type: 'Background Check',
-          name: 'BGV_Report.pdf',
-          status: 'in_progress',
-          uploadedDate: '2024-01-10',
-          verifiedDate: null,
-          size: '856 KB'
-        }
-      ],
-      bgvStatus: 'in_progress',
-      bgvProvider: 'SecureCheck Inc.',
-      bgvInitiated: '2024-01-08',
-      bgvExpected: '2024-01-15'
-    },
-    {
-      id: 2,
-      candidateName: 'Emily Davis',
-      position: 'Product Manager',
-      documents: [
-        {
-          id: 1,
-          type: 'ID Proof',
-          name: 'Drivers_License_Emily.pdf',
-          status: 'verified',
-          uploadedDate: '2024-01-05',
-          verifiedDate: '2024-01-06',
-          size: '1.9 MB'
-        },
-        {
-          id: 2,
-          type: 'Educational Certificate',
-          name: 'MBA_Certificate.pdf',
-          status: 'verified',
-          uploadedDate: '2024-01-05',
-          verifiedDate: '2024-01-06',
-          size: '2.1 MB'
-        },
-        {
-          id: 3,
-          type: 'Experience Letter',
-          name: 'Google_Experience_Letter.pdf',
-          status: 'verified',
-          uploadedDate: '2024-01-06',
-          verifiedDate: '2024-01-07',
-          size: '1.5 MB'
-        },
-        {
-          id: 4,
-          type: 'Background Check',
-          name: 'BGV_Complete_Report.pdf',
-          status: 'verified',
-          uploadedDate: '2024-01-07',
-          verifiedDate: '2024-01-12',
-          size: '1.1 MB'
-        }
-      ],
-      bgvStatus: 'completed',
-      bgvProvider: 'VerifyNow',
-      bgvInitiated: '2024-01-05',
-      bgvExpected: '2024-01-12'
-    },
-    {
-      id: 3,
-      candidateName: 'Michael Brown',
-      position: 'UX Designer',
-      documents: [
-        {
-          id: 1,
-          type: 'ID Proof',
-          name: 'Passport_Michael.pdf',
-          status: 'rejected',
-          uploadedDate: '2024-01-03',
-          verifiedDate: null,
-          size: '3.2 MB',
-          rejectionReason: 'Document unclear, please re-upload'
-        },
-        {
-          id: 2,
-          type: 'Educational Certificate',
-          name: 'Design_Degree.pdf',
-          status: 'verified',
-          uploadedDate: '2024-01-04',
-          verifiedDate: '2024-01-05',
-          size: '2.0 MB'
-        },
-        {
-          id: 3,
-          type: 'Experience Letter',
-          name: null,
-          status: 'missing',
-          uploadedDate: null,
-          verifiedDate: null,
-          size: null
-        },
-        {
-          id: 4,
-          type: 'Background Check',
-          name: null,
-          status: 'not_started',
-          uploadedDate: null,
-          verifiedDate: null,
-          size: null
-        }
-      ],
-      bgvStatus: 'not_started',
-      bgvProvider: null,
-      bgvInitiated: null,
-      bgvExpected: null
-    }
-  ];
+  useEffect(() => {
+    fetchSubmissions();
+  }, []);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'verified': 
-      case 'completed': return '#10b981';
-      case 'pending': 
-      case 'in_progress': return '#f59e0b';
-      case 'rejected': return '#ef4444';
-      case 'missing': 
-      case 'not_started': return '#6b7280';
-      default: return '#6b7280';
+  const fetchSubmissions = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('token');
+      
+      const response = await fetch(`${API_BASE_URL}/api/bgv/hr/submissions`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      });
+
+      if (!response.ok) throw new Error('Failed to fetch submissions');
+
+      const data = await response.json();
+      setSubmissions(data.data || []);
+    } catch (error) {
+      console.error('Error fetching BGV submissions:', error);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusIcon = (status: string) => {
-    switch (status) {
-      case 'verified': 
-      case 'completed': return <FiCheckCircle />;
-      case 'pending': 
-      case 'in_progress': return <FiClock />;
-      case 'rejected': return <FiX />;
-      case 'missing': 
-      case 'not_started': return <FiAlertTriangle />;
-      default: return <FiClock />;
+  const getStatusBadge = (submission: BGVSubmission) => {
+    const total = submission.total_verifications;
+    const verified = submission.verified_count;
+    const rejected = submission.rejected_count;
+
+    if (total === 0) {
+      return {
+        label: 'Pending Review',
+        color: '#eab308',
+        bgColor: '#fef9c3',
+        icon: <FiClock />
+      };
     }
+
+    if (rejected > 0) {
+      return {
+        label: 'Rejected',
+        color: '#ef4444',
+        bgColor: '#fee2e2',
+        icon: <FiX />
+      };
+    }
+
+    if (verified === total) {
+      return {
+        label: 'Verified',
+        color: '#10b981',
+        bgColor: '#d1fae5',
+        icon: <FiCheckCircle />
+      };
+    }
+
+    return {
+      label: 'In Progress',
+      color: '#3b82f6',
+      bgColor: '#dbeafe',
+      icon: <FiClock />
+    };
   };
 
-  const getStatusLabel = (status: string) => {
-    switch (status) {
-      case 'verified': return 'Verified';
-      case 'pending': return 'Pending Review';
-      case 'rejected': return 'Rejected';
-      case 'missing': return 'Missing';
-      case 'in_progress': return 'In Progress';
-      case 'completed': return 'Completed';
-      case 'not_started': return 'Not Started';
-      default: return status;
-    }
+  const formatDate = (dateString: string) => {
+    if (!dateString) return 'N/A';
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric'
+    });
   };
 
-  const filteredCandidates = selectedCandidate === 'all' 
-    ? candidatesDocuments 
-    : candidatesDocuments.filter(c => c.id.toString() === selectedCandidate);
+  const filteredSubmissions = submissions.filter(sub => {
+    if (filter === 'all') return true;
+    
+    const status = getStatusBadge(sub);
+    return status.label.toLowerCase().replace(' ', '_') === filter;
+  });
 
-  // TODO: Add document templates
-  // TODO: Add bulk document operations  
-  // TODO: Add integration with BGV providers
+  const handleViewSubmission = (fresherId: number) => {
+    navigate(`/hr/documents/${fresherId}`);
+  };
+
+  if (loading) {
+    return (
+      <div style={{
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        height: '400px'
+      }}>
+        <div>Loading submissions...</div>
+      </div>
+    );
+  }
 
   return (
-    <div style={{ padding: '20px', backgroundColor: 'white', minHeight: '500px' }}>
-      {/* Page Header */}
+    <div style={{
+      padding: '24px',
+      maxWidth: '1400px',
+      margin: '0 auto'
+    }}>
+      {/* Header */}
       <div style={{ marginBottom: '32px' }}>
-        <h1 style={{ 
-          color: '#1f2937', 
-          fontSize: '32px', 
-          fontWeight: 'bold',
-          marginBottom: '8px'
+        <h1 style={{
+          fontSize: '28px',
+          fontWeight: '700',
+          color: '#1f2937',
+          margin: '0 0 8px 0'
         }}>
-          Documents & Background Verification
+          Documents & BGV
         </h1>
-        <p style={{ 
-          color: '#6b7280', 
-          fontSize: '16px'
+        <p style={{
+          fontSize: '14px',
+          color: '#6b7280',
+          margin: 0
         }}>
-          Manage document collection and background verification process
+          Review and verify background verification documents from candidates
         </p>
       </div>
 
-      {/* Summary Stats */}
-      <div style={{
-        display: 'grid',
-        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-        gap: '20px',
-        marginBottom: '32px'
-      }}>
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <FiFileText style={{ width: '20px', height: '20px', color: '#2563eb' }} />
-            <span style={{ fontSize: '14px', color: '#6b7280' }}>Total Documents</span>
-          </div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>
-            {candidatesDocuments.reduce((sum, candidate) => sum + candidate.documents.length, 0)}
-          </div>
-        </div>
-
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <FiCheckCircle style={{ width: '20px', height: '20px', color: '#10b981' }} />
-            <span style={{ fontSize: '14px', color: '#6b7280' }}>Verified</span>
-          </div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>
-            {candidatesDocuments.reduce((sum, candidate) => 
-              sum + candidate.documents.filter(doc => doc.status === 'verified').length, 0
-            )}
-          </div>
-        </div>
-
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <FiClock style={{ width: '20px', height: '20px', color: '#f59e0b' }} />
-            <span style={{ fontSize: '14px', color: '#6b7280' }}>Pending Review</span>
-          </div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>
-            {candidatesDocuments.reduce((sum, candidate) => 
-              sum + candidate.documents.filter(doc => doc.status === 'pending').length, 0
-            )}
-          </div>
-        </div>
-
-        <div style={{
-          backgroundColor: 'white',
-          padding: '20px',
-          borderRadius: '12px',
-          border: '1px solid #e2e8f0',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '8px' }}>
-            <FiAlertTriangle style={{ width: '20px', height: '20px', color: '#ef4444' }} />
-            <span style={{ fontSize: '14px', color: '#6b7280' }}>Action Required</span>
-          </div>
-          <div style={{ fontSize: '24px', fontWeight: 'bold', color: '#1f2937' }}>
-            {candidatesDocuments.reduce((sum, candidate) => 
-              sum + candidate.documents.filter(doc => ['rejected', 'missing'].includes(doc.status)).length, 0
-            )}
-          </div>
-        </div>
-      </div>
-
-      {/* Filter Bar */}
+      {/* Filter Tabs */}
       <div style={{
         display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
+        gap: '16px',
         marginBottom: '24px',
-        padding: '16px',
-        backgroundColor: '#f8f9fa',
-        borderRadius: '12px',
-        border: '1px solid #e2e8f0'
+        borderBottom: '2px solid #e5e7eb',
+        flexWrap: 'wrap'
       }}>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <label style={{ fontSize: '14px', color: '#374151', fontWeight: '500' }}>
-            Filter by Candidate:
-          </label>
-          <select 
-            value={selectedCandidate}
-            onChange={(e) => setSelectedCandidate(e.target.value)}
+        {[
+          { key: 'all', label: 'All Candidates' },
+          { key: 'pending_review', label: 'Pending Review' },
+          { key: 'in_progress', label: 'In Progress' },
+          { key: 'verified', label: 'Verified' },
+          { key: 'rejected', label: 'Rejected' }
+        ].map(tab => (
+          <button
+            key={tab.key}
+            onClick={() => setFilter(tab.key)}
             style={{
-              padding: '8px 12px',
-              borderRadius: '8px',
-              border: '1px solid #d1d5db',
-              fontSize: '14px',
-              color: '#374151'
+              padding: '12px 24px',
+              border: 'none',
+              backgroundColor: 'transparent',
+              color: filter === tab.key ? '#2563eb' : '#6b7280',
+              fontWeight: filter === tab.key ? '600' : '500',
+              cursor: 'pointer',
+              borderBottom: filter === tab.key ? '2px solid #2563eb' : '2px solid transparent',
+              marginBottom: '-2px',
+              transition: 'all 0.2s'
             }}
           >
-            <option value="all">All Candidates</option>
-            {candidatesDocuments.map(candidate => (
-              <option key={candidate.id} value={candidate.id.toString()}>
-                {candidate.candidateName}
-              </option>
-            ))}
-          </select>
-        </div>
-
-        <button style={{
-          backgroundColor: '#2563eb',
-          color: 'white',
-          padding: '10px 16px',
-          border: 'none',
-          borderRadius: '8px',
-          fontSize: '14px',
-          fontWeight: '600',
-          cursor: 'pointer',
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px'
-        }}>
-          <FiUpload style={{ width: '16px', height: '16px' }} />
-          Bulk Upload
-        </button>
-      </div>
-
-      {/* Documents List */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        {filteredCandidates.map((candidate) => (
-          <div key={candidate.id} style={{
-            backgroundColor: 'white',
-            borderRadius: '12px',
-            border: '1px solid #e2e8f0',
-            overflow: 'hidden'
-          }}>
-            {/* Candidate Header */}
-            <div style={{
-              padding: '20px',
-              borderBottom: '1px solid #e2e8f0',
-              backgroundColor: '#f8f9fa'
-            }}>
-              <div style={{
-                display: 'flex',
-                justifyContent: 'space-between',
-                alignItems: 'center',
-                marginBottom: '16px'
-              }}>
-                <div>
-                  <h3 style={{
-                    fontSize: '20px',
-                    fontWeight: 'bold',
-                    color: '#1f2937',
-                    margin: '0 0 4px 0'
-                  }}>
-                    {candidate.candidateName}
-                  </h3>
-                  <p style={{
-                    fontSize: '16px',
-                    color: '#6b7280',
-                    margin: 0
-                  }}>
-                    {candidate.position}
-                  </p>
-                </div>
-
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '8px',
-                  backgroundColor: `${getStatusColor(candidate.bgvStatus)}20`,
-                  color: getStatusColor(candidate.bgvStatus),
-                  padding: '6px 12px',
-                  borderRadius: '8px',
-                  fontSize: '14px',
-                  fontWeight: '600'
-                }}>
-                  {getStatusIcon(candidate.bgvStatus)}
-                  BGV: {getStatusLabel(candidate.bgvStatus)}
-                </div>
-              </div>
-
-              {/* BGV Info */}
-              {candidate.bgvProvider && (
-                <div style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-                  gap: '16px',
-                  fontSize: '14px',
-                  color: '#6b7280'
-                }}>
-                  <div>Provider: {candidate.bgvProvider}</div>
-                  <div>Initiated: {candidate.bgvInitiated}</div>
-                  <div>Expected: {candidate.bgvExpected}</div>
-                </div>
-              )}
-            </div>
-
-            {/* Documents Grid */}
-            <div style={{ padding: '20px' }}>
-              <div style={{
-                display: 'grid',
-                gridTemplateColumns: 'repeat(auto-fit, minmax(300px, 1fr))',
-                gap: '16px'
-              }}>
-                {candidate.documents.map((doc) => (
-                  <div key={doc.id} style={{
-                    padding: '16px',
-                    border: '1px solid #e2e8f0',
-                    borderRadius: '8px',
-                    backgroundColor: '#fafafa'
-                  }}>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      alignItems: 'flex-start',
-                      marginBottom: '12px'
-                    }}>
-                      <div style={{ flex: 1 }}>
-                        <h4 style={{
-                          fontSize: '16px',
-                          fontWeight: '600',
-                          color: '#1f2937',
-                          margin: '0 0 4px 0'
-                        }}>
-                          {doc.type}
-                        </h4>
-                        <p style={{
-                          fontSize: '14px',
-                          color: '#6b7280',
-                          margin: '0 0 8px 0'
-                        }}>
-                          {doc.name || 'Not uploaded'}
-                        </p>
-                      </div>
-
-                      <div style={{
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: '4px',
-                        backgroundColor: `${getStatusColor(doc.status)}20`,
-                        color: getStatusColor(doc.status),
-                        padding: '4px 8px',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        fontWeight: '600'
-                      }}>
-                        {getStatusIcon(doc.status)}
-                        {getStatusLabel(doc.status)}
-                      </div>
-                    </div>
-
-                    {doc.name && (
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center'
-                      }}>
-                        <div style={{
-                          fontSize: '12px',
-                          color: '#6b7280'
-                        }}>
-                          <div>Uploaded: {doc.uploadedDate}</div>
-                          {doc.verifiedDate && <div>Verified: {doc.verifiedDate}</div>}
-                          <div>Size: {doc.size}</div>
-                        </div>
-
-                        <div style={{ display: 'flex', gap: '8px' }}>
-                          <button style={{
-                            padding: '6px',
-                            border: 'none',
-                            borderRadius: '6px',
-                            backgroundColor: '#e2e8f0',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                          title="View Document">
-                            <FiEye style={{ width: '14px', height: '14px', color: '#6b7280' }} />
-                          </button>
-                          
-                          <button style={{
-                            padding: '6px',
-                            border: 'none',
-                            borderRadius: '6px',
-                            backgroundColor: '#e2e8f0',
-                            cursor: 'pointer',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center'
-                          }}
-                          title="Download Document">
-                            <FiDownload style={{ width: '14px', height: '14px', color: '#6b7280' }} />
-                          </button>
-                        </div>
-                      </div>
-                    )}
-
-                    {doc.status === 'rejected' && doc.rejectionReason && (
-                      <div style={{
-                        marginTop: '12px',
-                        padding: '8px',
-                        backgroundColor: '#fef2f2',
-                        borderRadius: '6px',
-                        fontSize: '12px',
-                        color: '#dc2626'
-                      }}>
-                        <strong>Rejection Reason:</strong> {doc.rejectionReason}
-                      </div>
-                    )}
-
-                    {doc.status === 'missing' && (
-                      <button style={{
-                        width: '100%',
-                        padding: '8px',
-                        backgroundColor: '#2563eb',
-                        color: 'white',
-                        border: 'none',
-                        borderRadius: '6px',
-                        fontSize: '14px',
-                        fontWeight: '500',
-                        cursor: 'pointer',
-                        display: 'flex',
-                        alignItems: 'center',
-                        justifyContent: 'center',
-                        gap: '6px'
-                      }}>
-                        <FiUpload style={{ width: '14px', height: '14px' }} />
-                        Request Document
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+            {tab.label}
+          </button>
         ))}
       </div>
 
-      {/* TODO: Add document viewer modal */}
-      {/* TODO: Add document upload functionality */}
-      {/* TODO: Add BGV provider integration */}
-      {/* TODO: Add document approval workflow */}
+      {/* Submissions List */}
+      {filteredSubmissions.length === 0 ? (
+        <div style={{
+          textAlign: 'center',
+          padding: '48px 24px',
+          backgroundColor: '#f9fafb',
+          borderRadius: '12px',
+          border: '1px dashed #d1d5db'
+        }}>
+          <FiFileText style={{
+            width: '48px',
+            height: '48px',
+            color: '#9ca3af',
+            margin: '0 auto 16px'
+          }} />
+          <h3 style={{
+            fontSize: '18px',
+            fontWeight: '600',
+            color: '#374151',
+            margin: '0 0 8px 0'
+          }}>
+            No submissions found
+          </h3>
+          <p style={{
+            fontSize: '14px',
+            color: '#6b7280',
+            margin: 0
+          }}>
+            {filter === 'all' 
+              ? 'No candidates have submitted their BGV forms yet'
+              : `No submissions with status: ${filter.replace('_', ' ')}`
+            }
+          </p>
+        </div>
+      ) : (
+        <div style={{
+          display: 'grid',
+          gridTemplateColumns: 'repeat(auto-fill, minmax(400px, 1fr))',
+          gap: '24px'
+        }}>
+          {filteredSubmissions.map(submission => {
+            const status = getStatusBadge(submission);
+            
+            return (
+              <div
+                key={submission.submission_id}
+                style={{
+                  backgroundColor: 'white',
+                  borderRadius: '12px',
+                  padding: '24px',
+                  boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
+                  border: '1px solid #e5e7eb',
+                  cursor: 'pointer',
+                  transition: 'all 0.2s'
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.15)';
+                  e.currentTarget.style.transform = 'translateY(-2px)';
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.boxShadow = '0 1px 3px rgba(0, 0, 0, 0.1)';
+                  e.currentTarget.style.transform = 'translateY(0)';
+                }}
+                onClick={() => handleViewSubmission(submission.fresher_id)}
+              >
+                {/* Header with Status */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'flex-start',
+                  marginBottom: '16px'
+                }}>
+                  <div>
+                    <h3 style={{
+                      fontSize: '18px',
+                      fontWeight: '600',
+                      color: '#1f2937',
+                      margin: '0 0 4px 0'
+                    }}>
+                      {submission.first_name} {submission.last_name}
+                    </h3>
+                    <p style={{
+                      fontSize: '14px',
+                      color: '#6b7280',
+                      margin: 0
+                    }}>
+                      {submission.designation}
+                    </p>
+                  </div>
+
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '6px',
+                    backgroundColor: status.bgColor,
+                    color: status.color,
+                    padding: '6px 12px',
+                    borderRadius: '20px',
+                    fontSize: '12px',
+                    fontWeight: '600'
+                  }}>
+                    {status.icon}
+                    {status.label}
+                  </div>
+                </div>
+
+                {/* Info Grid */}
+                <div style={{
+                  display: 'grid',
+                  gridTemplateColumns: '1fr 1fr',
+                  gap: '12px',
+                  marginBottom: '16px',
+                  paddingBottom: '16px',
+                  borderBottom: '1px solid #e5e7eb'
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FiBriefcase style={{ color: '#6b7280', width: '14px', height: '14px' }} />
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af' }}>Provider</div>
+                      <div style={{ fontSize: '13px', color: '#374151', fontWeight: '500' }}>
+                        SecureCheck Inc.
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FiCalendar style={{ color: '#6b7280', width: '14px', height: '14px' }} />
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af' }}>Initiated</div>
+                      <div style={{ fontSize: '13px', color: '#374151', fontWeight: '500' }}>
+                        {formatDate(submission.submitted_at)}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FiUser style={{ color: '#6b7280', width: '14px', height: '14px' }} />
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af' }}>Email</div>
+                      <div style={{
+                        fontSize: '12px',
+                        color: '#374151',
+                        fontWeight: '500',
+                        overflow: 'hidden',
+                        textOverflow: 'ellipsis',
+                        whiteSpace: 'nowrap'
+                      }}>
+                        {submission.email}
+                      </div>
+                    </div>
+                  </div>
+
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <FiCalendar style={{ color: '#6b7280', width: '14px', height: '14px' }} />
+                    <div>
+                      <div style={{ fontSize: '11px', color: '#9ca3af' }}>Expected</div>
+                      <div style={{ fontSize: '13px', color: '#374151', fontWeight: '500' }}>
+                        {formatDate(new Date(new Date(submission.submitted_at).getTime() + 7 * 24 * 60 * 60 * 1000).toISOString())}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Documents Progress */}
+                <div style={{ marginBottom: '16px' }}>
+                  <div style={{
+                    display: 'flex',
+                    justifyContent: 'space-between',
+                    marginBottom: '8px'
+                  }}>
+                    <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                      Documents Verified
+                    </span>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>
+                      {submission.verified_count} / {submission.total_verifications || 'Pending'}
+                    </span>
+                  </div>
+                  
+                  {submission.total_verifications > 0 && (
+                    <div style={{
+                      height: '6px',
+                      backgroundColor: '#e5e7eb',
+                      borderRadius: '3px',
+                      overflow: 'hidden'
+                    }}>
+                      <div style={{
+                        height: '100%',
+                        width: `${(submission.verified_count / submission.total_verifications) * 100}%`,
+                        backgroundColor: submission.rejected_count > 0 ? '#ef4444' : '#10b981',
+                        transition: 'width 0.3s'
+                      }} />
+                    </div>
+                  )}
+                </div>
+
+                {/* View Button */}
+                <button
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    backgroundColor: '#2563eb',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    gap: '8px',
+                    transition: 'background-color 0.2s'
+                  }}
+                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleViewSubmission(submission.fresher_id);
+                  }}
+                >
+                  View Documents
+                  <FiArrowRight />
+                </button>
+              </div>
+            );
+          })}
+        </div>
+      )}
     </div>
   );
 };

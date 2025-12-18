@@ -23,6 +23,7 @@ import { HrAddUser } from './pages/hr/HrAddUser';
 import { HrCandidatesOffers } from './pages/hr/HrCandidatesOffers';
 import { HrPreJoinTasks } from './pages/hr/HrPreJoinTasks';
 import { HrDocumentsBGV } from './pages/hr/HrDocumentsBGV';
+import { HrBGVVerification } from './pages/hr/HrBGVVerification';
 import { HrPoliciesTemplates } from './pages/hr/HrPoliciesTemplates';
 import { HrReportsExports } from './pages/hr/HrReportsExports';
 import { HrSettings } from './pages/hr/HrSettings';
@@ -112,6 +113,10 @@ export const router = createBrowserRouter([
       {
         path: 'documents',
         element: <HrDocumentsBGV />
+      },
+      {
+        path: 'documents/:fresherId',
+        element: <HrBGVVerification />
       },
       {
         path: 'policies',

@@ -89,7 +89,16 @@ export const Documents = () => {
       motherDeceased: false,
       emergencyContacts: [{ name: '', mobile: '', relationship: '' }]
     },
-    education: {},
+    education: {
+      qualifications: [{
+        qualification: '',
+        university_institution: '',
+        cgpa_percentage: '',
+        year_of_passing: '',
+        documents: []
+      }],
+      additionalQualifications: []
+    },
     employment: {},
     passport: {},
     banking: {}
@@ -212,26 +221,77 @@ export const Documents = () => {
               const saved = result.savedPersonal;
               console.log('📋 Saved personal found:', saved);
               console.log('📋 Emergency contacts from DB:', saved.emergency_contacts);
+              console.log('📋 Emergency contacts type:', typeof saved.emergency_contacts);
+              console.log('📋 Emergency contacts is array?', Array.isArray(saved.emergency_contacts));
 
-              setFormData(prev => ({
-                ...prev,
-                personal: {
-                  maritalStatus: saved.marital_status || '',
-                  noOfChildren: saved.num_children || '',
-                  fatherName: saved.father_name || '',
-                  fatherDob: saved.father_dob ? new Date(saved.father_dob).toISOString().split('T')[0] : '',
-                  fatherDeceased: saved.father_deceased || false,
-                  motherName: saved.mother_name || '',
-                  motherDob: saved.mother_dob ? new Date(saved.mother_dob).toISOString().split('T')[0] : '',
-                  motherDeceased: saved.mother_deceased || false,
-                  emergencyContacts: saved.emergency_contacts && saved.emergency_contacts.length > 0 
-                    ? saved.emergency_contacts 
-                    : [{ name: '', mobile: '', relationship: '' }]
-                }
-              }));
+              // Map backend field names to frontend field names
+              const emergencyContacts = saved.emergency_contacts && Array.isArray(saved.emergency_contacts) && saved.emergency_contacts.length > 0 
+                ? saved.emergency_contacts.map(contact => ({
+                    name: contact.contact_person_name || contact.name || '',
+                    mobile: contact.mobile || '',
+                    relationship: contact.relationship || ''
+                  }))
+                : [{ name: '', mobile: '', relationship: '' }];
+
+              console.log('📋 Setting emergency contacts to:', emergencyContacts);
+              console.log('📋 First contact details:', emergencyContacts[0]);
+
+              setFormData(prev => {
+                const newData = {
+                  ...prev,
+                  personal: {
+                    maritalStatus: saved.marital_status || '',
+                    noOfChildren: saved.num_children || '',
+                    fatherName: saved.father_name || '',
+                    fatherDob: saved.father_dob ? new Date(saved.father_dob).toISOString().split('T')[0] : '',
+                    fatherDeceased: saved.father_deceased || false,
+                    motherName: saved.mother_name || '',
+                    motherDob: saved.mother_dob ? new Date(saved.mother_dob).toISOString().split('T')[0] : '',
+                    motherDeceased: saved.mother_deceased || false,
+                    emergencyContacts: emergencyContacts
+                  }
+                };
+                console.log('📋 New form data after personal update:', newData);
+                return newData;
+              });
 
               console.log('✅ Form populated with saved personal data');
-              console.log('✅ Emergency contacts loaded:', saved.emergency_contacts);
+              console.log('✅ Emergency contacts loaded:', emergencyContacts);
+            }
+
+            // Handle saved education data
+            if (result.savedEducation) {
+              const saved = result.savedEducation;
+              console.log('📋 Saved education found:', saved);
+              console.log('📋 Educational qualifications:', saved.educationalQualifications);
+              console.log('📋 Additional qualifications:', saved.additionalQualifications);
+
+              const educationalQualifications = saved.educationalQualifications && saved.educationalQualifications.length > 0
+                ? saved.educationalQualifications 
+                : [{
+                    qualification: '',
+                    university_institution: '',
+                    cgpa_percentage: '',
+                    year_of_passing: '',
+                    documents: []
+                  }];
+
+              console.log('📋 Setting qualifications to:', educationalQualifications);
+              console.log('📋 First qualification details:', educationalQualifications[0]);
+
+              setFormData(prev => {
+                const newData = {
+                  ...prev,
+                  education: {
+                    qualifications: educationalQualifications,
+                    additionalQualifications: saved.additionalQualifications || []
+                  }
+                };
+                console.log('📋 New form data after education update:', newData);
+                return newData;
+              });
+
+              console.log('✅ Form populated with saved education data');
             }
 
             if (result.prefilledData && !result.savedDemographics) {
@@ -514,15 +574,274 @@ export const Documents = () => {
     }
   };
 
+  // Education handlers
+  const handleAddEducation = () => {
+    setFormData(prev => ({
+      ...prev,
+      education: {
+        ...prev.education,
+        qualifications: [
+          ...(prev.education.qualifications || []),
+          {
+            qualification: '',
+            university_institution: '',
+            cgpa_percentage: '',
+            year_of_passing: '',
+            documents: []
+          }
+        ]
+      }
+    }));
+  };
+
+  const handleRemoveEducation = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      education: {
+        ...prev.education,
+        qualifications: prev.education.qualifications.filter((_, i) => i !== index)
+      }
+    }));
+  };
+
+  const handleEducationChange = (index: number, field: string, value: any) => {
+    setFormData(prev => {
+      const newQualifications = [...prev.education.qualifications];
+      newQualifications[index] = {
+        ...newQualifications[index],
+        [field]: value
+      };
+      return {
+        ...prev,
+        education: {
+          ...prev.education,
+          qualifications: newQualifications
+        }
+      };
+    });
+  };
+
+  const handleEducationFileUpload = async (index: number, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    try {
+      const fileArray = Array.from(files);
+      const validFiles = fileArray.filter(file => {
+        const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        
+        if (!validTypes.includes(file.type)) {
+          alert(`File ${file.name}: Invalid file type. Only PDF, JPG, JPEG, and PNG are allowed.`);
+          return false;
+        }
+        if (file.size > maxSize) {
+          alert(`File ${file.name}: File size exceeds 5MB limit.`);
+          return false;
+        }
+        return true;
+      });
+
+      if (validFiles.length === 0) return;
+
+      const documentPromises = validFiles.map(async (file) => {
+        const base64Data = await fileToBase64(file);
+        return {
+          name: file.name,
+          data: base64Data,
+          type: file.type,
+          size: file.size
+        };
+      });
+
+      const documents = await Promise.all(documentPromises);
+
+      setFormData(prev => {
+        const newQualifications = [...prev.education.qualifications];
+        newQualifications[index] = {
+          ...newQualifications[index],
+          documents: [...(newQualifications[index].documents || []), ...documents]
+        };
+        return {
+          ...prev,
+          education: {
+            ...prev.education,
+            qualifications: newQualifications
+          }
+        };
+      });
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      alert('Failed to upload files. Please try again.');
+    }
+  };
+
+  const handleAddAdditionalQualification = () => {
+    setFormData(prev => ({
+      ...prev,
+      education: {
+        ...prev.education,
+        additionalQualifications: [
+          ...(prev.education.additionalQualifications || []),
+          {
+            certificate_name: '',
+            documents: []
+          }
+        ]
+      }
+    }));
+  };
+
+  const handleRemoveAdditionalQualification = (index: number) => {
+    setFormData(prev => ({
+      ...prev,
+      education: {
+        ...prev.education,
+        additionalQualifications: prev.education.additionalQualifications.filter((_, i) => i !== index)
+      }
+    }));
+  };
+
+  const handleAdditionalQualificationChange = (index: number, field: string, value: any) => {
+    setFormData(prev => {
+      const newQualifications = [...prev.education.additionalQualifications];
+      newQualifications[index] = {
+        ...newQualifications[index],
+        [field]: value
+      };
+      return {
+        ...prev,
+        education: {
+          ...prev.education,
+          additionalQualifications: newQualifications
+        }
+      };
+    });
+  };
+
+  const handleAdditionalQualificationFileUpload = async (index: number, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+
+    try {
+      const fileArray = Array.from(files);
+      const validFiles = fileArray.filter(file => {
+        const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+        const maxSize = 5 * 1024 * 1024; // 5MB
+        
+        if (!validTypes.includes(file.type)) {
+          alert(`File ${file.name}: Invalid file type. Only PDF, JPG, JPEG, and PNG are allowed.`);
+          return false;
+        }
+        if (file.size > maxSize) {
+          alert(`File ${file.name}: File size exceeds 5MB limit.`);
+          return false;
+        }
+        return true;
+      });
+
+      if (validFiles.length === 0) return;
+
+      const documentPromises = validFiles.map(async (file) => {
+        const base64Data = await fileToBase64(file);
+        return {
+          name: file.name,
+          data: base64Data,
+          type: file.type,
+          size: file.size
+        };
+      });
+
+      const documents = await Promise.all(documentPromises);
+
+      setFormData(prev => {
+        const newQualifications = [...prev.education.additionalQualifications];
+        newQualifications[index] = {
+          ...newQualifications[index],
+          documents: [...(newQualifications[index].documents || []), ...documents]
+        };
+        return {
+          ...prev,
+          education: {
+            ...prev.education,
+            additionalQualifications: newQualifications
+          }
+        };
+      });
+    } catch (error) {
+      console.error('Error uploading files:', error);
+      alert('Failed to upload files. Please try again.');
+    }
+  };
+
+  // Validate education section
+  const validateEducationSection = () => {
+    const errors = [];
+
+    // At least one educational qualification required
+    if (!formData.education.qualifications || formData.education.qualifications.length === 0) {
+      errors.push('At least one educational qualification is required');
+      return errors;
+    }
+
+    // Validate each qualification
+    formData.education.qualifications.forEach((qual, index) => {
+      if (!qual.qualification) {
+        errors.push(`Qualification ${index + 1}: Qualification type is required`);
+      }
+      if (!qual.university_institution || !qual.university_institution.trim()) {
+        errors.push(`Qualification ${index + 1}: University/Institution is required`);
+      }
+      if (!qual.cgpa_percentage || !qual.cgpa_percentage.trim()) {
+        errors.push(`Qualification ${index + 1}: CGPA/Percentage is required`);
+      }
+      if (!qual.year_of_passing) {
+        errors.push(`Qualification ${index + 1}: Year of Passing is required`);
+      } else {
+        const year = parseInt(qual.year_of_passing);
+        const currentYear = new Date().getFullYear();
+        if (year > currentYear) {
+          errors.push(`Qualification ${index + 1}: Year of Passing cannot be in the future`);
+        }
+        if (year < 1950) {
+          errors.push(`Qualification ${index + 1}: Year of Passing must be after 1950`);
+        }
+      }
+      if (!qual.documents || qual.documents.length === 0) {
+        errors.push(`Qualification ${index + 1}: At least one document is required`);
+      }
+    });
+
+    // Validate additional qualifications if any
+    if (formData.education.additionalQualifications && formData.education.additionalQualifications.length > 0) {
+      formData.education.additionalQualifications.forEach((cert, index) => {
+        if (!cert.certificate_name || !cert.certificate_name.trim()) {
+          errors.push(`Additional Qualification ${index + 1}: Certificate name is required`);
+        }
+        if (!cert.documents || cert.documents.length === 0) {
+          errors.push(`Additional Qualification ${index + 1}: At least one document is required`);
+        }
+      });
+    }
+
+    return errors;
+  };
+
   // Save and navigate to next section
   const handleSaveAndNext = async () => {
-    const validationErrors = validatePersonalSection();
+    const section = sections[activeSection];
+    let validationErrors = [];
+
+    if (section.id === 'personal') {
+      validationErrors = validatePersonalSection();
+    } else if (section.id === 'education') {
+      validationErrors = validateEducationSection();
+    }
+
     if (validationErrors.length > 0) {
       alert('Please complete all required fields before proceeding:\n\n' + validationErrors.join('\n'));
       return;
     }
     
-    await handleSavePersonal();
+    await handleSave();
     if (activeSection < sections.length - 1) {
       setActiveSection(activeSection + 1);
     }
@@ -537,7 +856,9 @@ export const Documents = () => {
       }
 
       const section = sections[activeSection];
-      console.log('Saving section:', section.id, formData);
+      console.log('💾 handleSave called for section:', section.id);
+      console.log('💾 Current formData:', formData);
+      console.log('💾 Emergency contacts in formData:', formData.personal.emergencyContacts);
 
       let apiEndpoint = '';
       let dataToSave = {};
@@ -615,10 +936,15 @@ export const Documents = () => {
             mother_deceased: formData.personal.motherDeceased,
             emergency_contacts: formData.personal.emergencyContacts
           };
+          console.log('📤 Sending personal data:', dataToSave);
+          console.log('📤 Emergency contacts being sent:', dataToSave.emergency_contacts);
           break;
         case 'education':
           apiEndpoint = '/api/bgv/education';
-          dataToSave = formData.education;
+          dataToSave = {
+            educationalQualifications: formData.education.qualifications || [],
+            additionalQualifications: formData.education.additionalQualifications || []
+          };
           break;
         case 'employment':
           apiEndpoint = '/api/bgv/employment';
@@ -691,13 +1017,17 @@ export const Documents = () => {
   const handleNext = async () => {
     // Validate current section before navigating
     const section = sections[activeSection];
+    let validationErrors = [];
     
     if (section.id === 'personal') {
-      const validationErrors = validatePersonalSection();
-      if (validationErrors.length > 0) {
-        alert('Please complete all required fields before proceeding:\n\n' + validationErrors.join('\n'));
-        return;
-      }
+      validationErrors = validatePersonalSection();
+    } else if (section.id === 'education') {
+      validationErrors = validateEducationSection();
+    }
+    
+    if (validationErrors.length > 0) {
+      alert('Please complete all required fields before proceeding:\n\n' + validationErrors.join('\n'));
+      return;
     }
     
     await handleSave();
@@ -2025,9 +2355,265 @@ export const Documents = () => {
         return (
           <div style={{ padding: '20px' }}>
             <h3 style={{ color: 'black', marginBottom: '20px', fontSize: '20px' }}>Educational Background</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
-              Provide details about your educational qualifications and upload relevant documents.
-            </p>
+            
+            {/* Educational Qualifications Section */}
+            <div style={{ marginBottom: '40px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h4 style={{ color: '#1f2937', fontSize: '16px', fontWeight: '600' }}>
+                  Educational Qualifications <span style={{ color: '#ef4444' }}>*</span>
+                </h4>
+                <button
+                  onClick={handleAddEducation}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '8px 16px',
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  <span>+ Add More</span>
+                </button>
+              </div>
+
+              {/* Educational Qualifications Table */}
+              <div style={{ overflowX: 'auto' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                  <thead>
+                    <tr style={{ backgroundColor: '#f9fafb', borderBottom: '2px solid #e5e7eb' }}>
+                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Qualification <span style={{ color: '#ef4444' }}>*</span></th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>University/Institution <span style={{ color: '#ef4444' }}>*</span></th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>CGPA/% <span style={{ color: '#ef4444' }}>*</span></th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Year of Passing <span style={{ color: '#ef4444' }}>*</span></th>
+                      <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Documents <span style={{ color: '#ef4444' }}>*</span></th>
+                      <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {formData.education.qualifications && formData.education.qualifications.map((qual, index) => (
+                        <tr key={index} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                          <td style={{ padding: '12px' }}>
+                            <select
+                              value={qual.qualification}
+                              onChange={(e) => handleEducationChange(index, 'qualification', e.target.value)}
+                              style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '14px'
+                              }}
+                            >
+                              <option value="">Select</option>
+                              <option value="10th">10th</option>
+                              <option value="12th">12th</option>
+                              <option value="Diploma">Diploma</option>
+                              <option value="Bachelor of Technology">Bachelor of Technology</option>
+                              <option value="Bachelor of Science">Bachelor of Science</option>
+                              <option value="Bachelor of Arts">Bachelor of Arts</option>
+                              <option value="Bachelor of Commerce">Bachelor of Commerce</option>
+                              <option value="Master of Technology">Master of Technology</option>
+                              <option value="Master of Science">Master of Science</option>
+                              <option value="Master of Arts">Master of Arts</option>
+                              <option value="Master of Commerce">Master of Commerce</option>
+                              <option value="Master of Business Administration">Master of Business Administration</option>
+                              <option value="PhD">PhD</option>
+                              <option value="Other">Other</option>
+                            </select>
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <input
+                              type="text"
+                              value={qual.university_institution}
+                              onChange={(e) => handleEducationChange(index, 'university_institution', e.target.value)}
+                              placeholder="Enter university/institution"
+                              style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '14px'
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <input
+                              type="text"
+                              value={qual.cgpa_percentage}
+                              onChange={(e) => handleEducationChange(index, 'cgpa_percentage', e.target.value)}
+                              placeholder="e.g., 8.2, 82%"
+                              style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '14px'
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <input
+                              type="number"
+                              value={qual.year_of_passing}
+                              onChange={(e) => handleEducationChange(index, 'year_of_passing', e.target.value)}
+                              placeholder="YYYY"
+                              min="1950"
+                              max={new Date().getFullYear()}
+                              style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '14px'
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <input
+                              type="file"
+                              multiple
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              onChange={(e) => handleEducationFileUpload(index, e.target.files)}
+                              style={{ fontSize: '12px' }}
+                            />
+                            {qual.documents && qual.documents.length > 0 && (
+                              <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
+                                {qual.documents.length} file(s) uploaded
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            {formData.education.qualifications.length > 1 && (
+                              <button
+                                onClick={() => handleRemoveEducation(index)}
+                                style={{
+                                  padding: '6px 12px',
+                                  backgroundColor: '#ef4444',
+                                  color: 'white',
+                                  border: 'none',
+                                  borderRadius: '6px',
+                                  fontSize: '12px',
+                                  cursor: 'pointer'
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+            </div>
+
+            {/* Additional Qualifications Section */}
+            <div style={{ marginBottom: '20px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '15px' }}>
+                <h4 style={{ color: '#1f2937', fontSize: '16px', fontWeight: '600' }}>
+                  Additional Qualifications / Certificates (Optional)
+                </h4>
+                <button
+                  onClick={handleAddAdditionalQualification}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '5px',
+                    padding: '8px 16px',
+                    backgroundColor: '#3b82f6',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '6px',
+                    fontSize: '14px',
+                    cursor: 'pointer',
+                    fontWeight: '500'
+                  }}
+                >
+                  <span>Add +</span>
+                </button>
+              </div>
+
+              {formData.education.additionalQualifications && formData.education.additionalQualifications.length > 0 ? (
+                <div style={{ overflowX: 'auto' }}>
+                  <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '14px' }}>
+                    <thead>
+                      <tr style={{ backgroundColor: '#f0f9ff', borderBottom: '2px solid #bfdbfe' }}>
+                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Name of Qualification/Certificate</th>
+                        <th style={{ padding: '12px', textAlign: 'left', fontWeight: '600', color: '#374151' }}>Documents</th>
+                        <th style={{ padding: '12px', textAlign: 'center', fontWeight: '600', color: '#374151' }}>Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {formData.education.additionalQualifications.map((cert, index) => (
+                        <tr key={index} style={{ borderBottom: '1px solid #e5e7eb' }}>
+                          <td style={{ padding: '12px' }}>
+                            <input
+                              type="text"
+                              value={cert.certificate_name}
+                              onChange={(e) => handleAdditionalQualificationChange(index, 'certificate_name', e.target.value)}
+                              placeholder="Enter certificate name"
+                              style={{
+                                width: '100%',
+                                padding: '8px',
+                                border: '1px solid #d1d5db',
+                                borderRadius: '6px',
+                                fontSize: '14px'
+                              }}
+                            />
+                          </td>
+                          <td style={{ padding: '12px' }}>
+                            <input
+                              type="file"
+                              multiple
+                              accept=".pdf,.jpg,.jpeg,.png"
+                              onChange={(e) => handleAdditionalQualificationFileUpload(index, e.target.files)}
+                              style={{ fontSize: '12px' }}
+                            />
+                            {cert.documents && cert.documents.length > 0 && (
+                              <div style={{ fontSize: '12px', color: '#3b82f6', marginTop: '4px' }}>
+                                {cert.documents.length} file(s) uploaded
+                              </div>
+                            )}
+                          </td>
+                          <td style={{ padding: '12px', textAlign: 'center' }}>
+                            <button
+                              onClick={() => handleRemoveAdditionalQualification(index)}
+                              style={{
+                                padding: '6px 12px',
+                                backgroundColor: '#ef4444',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '6px',
+                                fontSize: '12px',
+                                cursor: 'pointer'
+                              }}
+                            >
+                              Remove
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div style={{ 
+                  padding: '30px', 
+                  textAlign: 'center', 
+                  backgroundColor: '#f0f9ff', 
+                  borderRadius: '8px',
+                  border: '2px dashed #bfdbfe'
+                }}>
+                  <p style={{ color: '#6b7280', fontSize: '14px' }}>No additional qualifications added</p>
+                </div>
+              )}
+            </div>
           </div>
         );
 
