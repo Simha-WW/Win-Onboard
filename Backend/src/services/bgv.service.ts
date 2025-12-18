@@ -579,6 +579,13 @@ export class BGVService {
       const pool = getMSSQLPool();
       const mssql = await import('mssql');
 
+      console.log('🔍 Received demographics data:', {
+        dob_as_per_records: data.dob_as_per_records,
+        celebrated_dob: data.celebrated_dob,
+        dobType: typeof data.celebrated_dob,
+        dobValue: data.celebrated_dob
+      });
+
       // Check if demographics exist
       const existingResult = await pool.request()
         .input('submissionId', mssql.Int, submissionId)

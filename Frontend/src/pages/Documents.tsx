@@ -397,7 +397,7 @@ export const Documents = () => {
             last_name: formData.demographics.lastName,
             name_for_records: formData.demographics.nameForRecords,
             dob_as_per_records: formData.demographics.dobAsPerRecords,
-            celebrated_dob: formData.demographics.celebratedDOB,
+            celebrated_dob: formData.demographics.celebratedDob,
             gender: formData.demographics.gender,
             blood_group: formData.demographics.bloodGroup,
             whatsapp_number: formData.demographics.whatsappNumber,
