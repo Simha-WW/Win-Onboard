@@ -115,7 +115,7 @@ export const Documents = () => {
 
         console.log('📡 Making API call to /api/bgv/submission...');
         
-        const response = await fetch('/api/bgv/submission', {
+        const response = await fetch('http://localhost:3000/api/bgv/submission', {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -217,7 +217,7 @@ export const Documents = () => {
                 ...prev,
                 personal: {
                   maritalStatus: saved.marital_status || '',
-                  noOfChildren: saved.no_of_children || '',
+                  noOfChildren: saved.num_children || '',
                   fatherName: saved.father_name || '',
                   fatherDob: saved.father_dob ? new Date(saved.father_dob).toISOString().split('T')[0] : '',
                   fatherDeceased: saved.father_deceased || false,
