@@ -115,6 +115,49 @@ export class AuthController {
   }
 
   /**
+   * HR login with email and password
+   * POST /api/auth/hr/login
+   */
+  static async authenticateHRWithCredentials(req: Request, res: Response): Promise<Response | void> {
+    try {
+      const { email, password } = req.body;
+      
+      if (!email || !password) {
+        return res.status(400).json({
+          success: false,
+          message: 'Email and password are required'
+        });
+      }
+
+      // Validate HR credentials
+      const authResult = await AuthService.validateHRCredentials(
+        email.trim(),
+        password
+      );
+      
+      if (!authResult.success) {
+        return res.status(401).json({
+          success: false,
+          message: authResult.error
+        });
+      }
+
+      res.json({
+        success: true,
+        user: authResult.user,
+        token: authResult.token,
+        message: 'HR authentication successful'
+      });
+    } catch (error) {
+      console.error('HR login error:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Authentication failed'
+      });
+    }
+  }
+
+  /**
    * HR email authentication endpoint (development bypass)
    * POST /api/auth/hr-email
    */

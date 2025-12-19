@@ -1638,4 +1638,87 @@ export class BGVService {
     }
   }
 
+  /**
+   * Get complete BGV submission data for a fresher
+   * Retrieves data from bgv_demographics, bgv_personal, and educational_details tables
+   */
+  static async getBGVSubmissionData(fresherId: number): Promise<any> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      console.log(`📄 Fetching complete BGV submission data for fresher ${fresherId}...`);
+
+      // Get fresher basic info
+      const fresherResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT 
+            id,
+            first_name,
+            last_name,
+            email,
+            designation,
+            department,
+            joining_date
+          FROM freshers
+          WHERE id = @fresherId
+        `);
+
+      if (fresherResult.recordset.length === 0) {
+        console.log(`❌ No fresher found with id ${fresherId}`);
+        return null;
+      }
+
+      const fresherInfo = fresherResult.recordset[0];
+
+      // Get demographics data
+      const demographicsResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT * FROM bgv_demographics
+          WHERE fresher_id = @fresherId
+        `);
+
+      // Get personal data
+      const personalResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT * FROM bgv_personal
+          WHERE fresher_id = @fresherId
+        `);
+
+      // Get educational details
+      const educationResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT * FROM educational_details
+          WHERE fresher_id = @fresherId
+          ORDER BY id
+        `);
+
+      // Get BGV submission status
+      const submissionResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT * FROM bgv_submissions
+          WHERE fresher_id = @fresherId
+        `);
+
+      console.log(`✅ Found data - Demographics: ${demographicsResult.recordset.length}, Personal: ${personalResult.recordset.length}, Education: ${educationResult.recordset.length}`);
+
+      return {
+        fresher: fresherInfo,
+        demographics: demographicsResult.recordset[0] || null,
+        personal: personalResult.recordset[0] || null,
+        education: educationResult.recordset || [],
+        submission: submissionResult.recordset[0] || null
+      };
+    } catch (error) {
+      console.error('Error fetching BGV submission data:', error);
+      throw error;
+    }
+  }
+
 }

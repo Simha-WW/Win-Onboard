@@ -180,6 +180,85 @@ export class AuthService {
   }
 
   /**
+   * Validate HR user with email and password
+   */
+  static async validateHRCredentials(email: string, password: string): Promise<AuthResult> {
+    try {
+      // Get database pool
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      
+      // Query HR user by email from hr_normal_login table
+      const result = await pool.request()
+        .input('email', email.toLowerCase())
+        .query(`
+          SELECT id, email, hashed_password, first_name, last_name, role, department, is_active
+          FROM hr_normal_login
+          WHERE LOWER(email) = @email
+        `);
+      
+      if (result.recordset.length === 0) {
+        return {
+          success: false,
+          error: 'Invalid email or password'
+        };
+      }
+      
+      const hrUser = result.recordset[0];
+      
+      // Check if account is active
+      if (!hrUser.is_active) {
+        return {
+          success: false,
+          error: 'Your account has been deactivated. Please contact your administrator.'
+        };
+      }
+      
+      // Check if password is set
+      if (!hrUser.hashed_password) {
+        return {
+          success: false,
+          error: 'Password not set for this account. Please contact your administrator.'
+        };
+      }
+      
+      // Verify password
+      const isPasswordValid = await bcrypt.compare(password, hrUser.hashed_password);
+      if (!isPasswordValid) {
+        return {
+          success: false,
+          error: 'Invalid email or password'
+        };
+      }
+      
+      // Transform to user format
+      const user: User = {
+        id: hrUser.id.toString(),
+        email: hrUser.email,
+        firstName: hrUser.first_name,
+        lastName: hrUser.last_name,
+        role: 'HR',
+        department: hrUser.department
+      };
+      
+      // Generate JWT token
+      const token = this.generateToken(user);
+      
+      return {
+        success: true,
+        user,
+        token
+      };
+    } catch (error) {
+      console.error('HR credentials validation error:', error);
+      return {
+        success: false,
+        error: 'Authentication failed. Please try again.'
+      };
+    }
+  }
+
+  /**
    * Ensure HR users table exists with correct structure
    */
   static async ensureHRUsersTable(pool: any, mssql: any): Promise<void> {

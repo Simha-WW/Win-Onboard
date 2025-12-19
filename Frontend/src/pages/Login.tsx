@@ -181,6 +181,57 @@ export const Login: React.FC = () => {
     }
   };
 
+  // Handle HR login with email and password
+  const handleHRLogin = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!hrEmail.trim() || !password.trim()) {
+      return;
+    }
+
+    setIsSubmitting(true);
+    clearError();
+    try {
+      // Call the new HR login API endpoint
+      const apiUrl = 'http://localhost:3000/api/auth/hr/login';
+      console.log('Calling HR login API:', apiUrl);
+      console.log('Email:', hrEmail.trim());
+      
+      const response = await fetch(apiUrl, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+          email: hrEmail.trim(),
+          password: password
+        })
+      });
+
+      console.log('Response status:', response.status);
+      const data = await response.json();
+      console.log('Response data:', data);
+
+      if (response.ok && data.success) {
+        // Store the token and user data (use 'auth_user' to match AuthContext)
+        localStorage.setItem('auth_token', data.token);
+        localStorage.setItem('auth_user', JSON.stringify(data.user));
+        console.log('Login successful, token and user stored');
+        console.log('User:', data.user);
+        console.log('Token:', data.token.substring(0, 50) + '...');
+        
+        // Reload the page to trigger AuthContext to pick up the new token
+        window.location.reload();
+      } else {
+        throw new Error(data.message || 'Login failed');
+      }
+    } catch (error: any) {
+      console.error('HR login failed:', error);
+      alert(error.message || 'Authentication failed. Please check your credentials.');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
   const renderModeSelection = () => (
     <div style={{ textAlign: 'center' }}>
       <h1 style={{ 
@@ -260,7 +311,7 @@ export const Login: React.FC = () => {
           }}
         >
           <FiShield style={{ fontSize: '1.25rem', color: '#10b981' }} />
-          Login as Admin (Microsoft Login)
+          Login as Admin (HR)
         </button>
       </div>
     </div>
@@ -426,81 +477,135 @@ export const Login: React.FC = () => {
         color: '#6b7280', 
         marginBottom: '2rem' 
       }}>
-        Choose your sign-in method
+        Sign in with your HR credentials
       </p>
 
-      <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-        {/* Primary Microsoft Login */}
+      <form onSubmit={handleHRLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
+        {/* Email Field */}
+        <div>
+          <div style={{ 
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            <FiMail style={{ 
+              position: 'absolute',
+              left: '0.75rem',
+              color: '#9ca3af',
+              fontSize: '1rem'
+            }} />
+            <input
+              type="email"
+              placeholder="Email Address"
+              value={hrEmail}
+              onChange={(e) => setHREmail(e.target.value)}
+              style={{
+                width: '100%',
+                paddingLeft: '2.5rem',
+                paddingRight: '1rem',
+                paddingTop: '0.75rem',
+                paddingBottom: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '1rem',
+                backgroundColor: 'white',
+                outline: 'none',
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#10b981'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
+              required
+            />
+          </div>
+        </div>
+
+        {/* Password Field */}
+        <div>
+          <div style={{ 
+            position: 'relative',
+            display: 'flex',
+            alignItems: 'center'
+          }}>
+            <FiLock style={{ 
+              position: 'absolute',
+              left: '0.75rem',
+              color: '#9ca3af',
+              fontSize: '1rem'
+            }} />
+            <input
+              type={showPassword ? 'text' : 'password'}
+              placeholder="Password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              style={{
+                width: '100%',
+                paddingLeft: '2.5rem',
+                paddingRight: '3rem',
+                paddingTop: '0.75rem',
+                paddingBottom: '0.75rem',
+                border: '1px solid #d1d5db',
+                borderRadius: '0.375rem',
+                fontSize: '1rem',
+                backgroundColor: 'white',
+                outline: 'none',
+              }}
+              onFocus={(e) => e.currentTarget.style.borderColor = '#10b981'}
+              onBlur={(e) => e.currentTarget.style.borderColor = '#d1d5db'}
+              required
+            />
+            <button
+              type="button"
+              onClick={() => setShowPassword(!showPassword)}
+              style={{
+                position: 'absolute',
+                right: '0.75rem',
+                border: 'none',
+                backgroundColor: 'transparent',
+                cursor: 'pointer',
+                padding: '0.25rem',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center'
+              }}
+            >
+              {showPassword ? (
+                <FiEyeOff style={{ color: '#9ca3af', fontSize: '1rem' }} />
+              ) : (
+                <FiEye style={{ color: '#9ca3af', fontSize: '1rem' }} />
+              )}
+            </button>
+          </div>
+        </div>
+
+        {/* Login Button */}
         <button
-          onClick={() => loginWithMicrosoft(false)}
+          type="submit"
           disabled={isSubmitting || isLoading}
           style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.75rem',
             width: '100%',
-            padding: '1rem 2rem',
-            backgroundColor: isSubmitting || isLoading ? '#9ca3af' : '#0078d4',
+            padding: '0.75rem',
+            backgroundColor: isSubmitting || isLoading ? '#9ca3af' : '#10b981',
             color: 'white',
             border: 'none',
             borderRadius: '0.375rem',
             fontSize: '1rem',
             fontWeight: '600',
             cursor: isSubmitting || isLoading ? 'not-allowed' : 'pointer',
-            transition: 'background-color 0.2s',
-            boxShadow: '0 2px 4px rgba(0, 120, 212, 0.3)'
+            transition: 'background-color 0.2s'
           }}
           onMouseOver={(e) => {
             if (!isSubmitting && !isLoading) {
-              e.currentTarget.style.backgroundColor = '#106ebe';
+              e.currentTarget.style.backgroundColor = '#059669';
             }
           }}
           onMouseOut={(e) => {
             if (!isSubmitting && !isLoading) {
-              e.currentTarget.style.backgroundColor = '#0078d4';
+              e.currentTarget.style.backgroundColor = '#10b981';
             }
           }}
         >
-          <FiMail style={{ fontSize: '1.25rem' }} />
-          {isSubmitting || isLoading ? 'Signing In...' : 'Sign in with Microsoft'}
+          {isSubmitting || isLoading ? 'Signing In...' : 'Sign In'}
         </button>
-
-        {/* Organization Account Option */}
-        <button
-          onClick={() => loginWithMicrosoft(true)}
-          disabled={isSubmitting || isLoading}
-          style={{
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            gap: '0.75rem',
-            width: '100%',
-            padding: '0.75rem 1.5rem',
-            backgroundColor: isSubmitting || isLoading ? '#f3f4f6' : 'white',
-            color: isSubmitting || isLoading ? '#9ca3af' : '#0078d4',
-            border: '1px solid #0078d4',
-            borderRadius: '0.375rem',
-            fontSize: '0.875rem',
-            fontWeight: '500',
-            cursor: isSubmitting || isLoading ? 'not-allowed' : 'pointer',
-            transition: 'all 0.2s'
-          }}
-          onMouseOver={(e) => {
-            if (!isSubmitting && !isLoading) {
-              e.currentTarget.style.backgroundColor = '#f8fafc';
-            }
-          }}
-          onMouseOut={(e) => {
-            if (!isSubmitting && !isLoading) {
-              e.currentTarget.style.backgroundColor = 'white';
-            }
-          }}
-        >
-          <FiShield style={{ fontSize: '1rem' }} />
-          Organization Account (WinWire)
-        </button>
-      </div>
+      </form>
 
       {error && (
         <div style={{
@@ -525,7 +630,7 @@ export const Login: React.FC = () => {
         fontSize: '0.875rem',
         color: '#0369a1'
       }}>
-        <strong>HR Access:</strong> After Microsoft login, your account will be validated against our HR users database. Only authorized HR personnel will be granted access to the HR portal.
+        <strong>HR Access:</strong> Only authorized HR personnel with valid credentials can access the HR portal.
       </div>
 
       <button

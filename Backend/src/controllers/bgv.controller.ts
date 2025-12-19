@@ -624,12 +624,28 @@ export class BGVController {
 
       console.log(`📋 Fetching verification status for fresher ${fresherId}...`);
 
+      // Get BGV submission data from the three tables
+      const bgvData = await BGVService.getBGVSubmissionData(fresherId);
+      
+      if (!bgvData) {
+        res.status(404).json({
+          success: false,
+          message: 'No data found for this fresher'
+        });
+        return;
+      }
+
       const verifications = await BGVService.getBGVVerificationStatus(fresherId);
       const groupedVerifications = await BGVService.getAllDocumentVerifications(fresherId);
 
       res.status(200).json({
         success: true,
         data: {
+          fresher: bgvData.fresher,
+          demographics: bgvData.demographics,
+          personal: bgvData.personal,
+          education: bgvData.education,
+          submission: bgvData.submission,
           verifications,
           grouped: groupedVerifications
         }

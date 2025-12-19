@@ -1,6 +1,6 @@
 /**
  * HR BGV Verification Detail Page
- * View and verify individual documents for a fresher
+ * View and verify BGV submission documents for a fresher
  */
 
 import React, { useState, useEffect } from 'react';
@@ -12,27 +12,90 @@ import {
   FiEye,
   FiClock,
   FiMail,
-  FiAlertCircle
+  FiAlertCircle,
+  FiUser,
+  FiMapPin,
+  FiPhone,
+  FiBook
 } from 'react-icons/fi';
 import { API_BASE_URL } from '../../config';
 
-interface DocumentVerification {
-  verification_id?: number;
-  document_type: string;
-  document_section: string;
-  status: string;
-  comments?: string;
-  verified_at?: string;
-  hr_first_name?: string;
-  hr_last_name?: string;
-  document_value?: any;
-}
-
 interface FresherInfo {
+  id: number;
   first_name: string;
   last_name: string;
   email: string;
   designation: string;
+  department?: string;
+  joining_date?: string;
+}
+
+interface Demographics {
+  salutation?: string;
+  first_name?: string;
+  middle_name?: string;
+  last_name?: string;
+  name_for_records?: string;
+  dob_as_per_records?: string;
+  celebrated_dob?: string;
+  gender?: string;
+  blood_group?: string;
+  whatsapp_number?: string;
+  linkedin_url?: string;
+  aadhaar_card_number?: string;
+  pan_card_number?: string;
+  comm_house_number?: string;
+  comm_street_name?: string;
+  comm_city?: string;
+  comm_district?: string;
+  comm_state?: string;
+  comm_country?: string;
+  comm_pin_code?: string;
+  perm_house_number?: string;
+  perm_street_name?: string;
+  perm_city?: string;
+  perm_district?: string;
+  perm_state?: string;
+  perm_country?: string;
+  perm_pin_code?: string;
+}
+
+interface Personal {
+  marital_status?: string;
+  num_children?: number;
+  father_name?: string;
+  father_dob?: string;
+  father_deceased?: boolean;
+  mother_name?: string;
+  mother_dob?: string;
+  mother_deceased?: boolean;
+  emergency_contacts?: string;
+}
+
+interface EducationDocument {
+  name: string;
+  data: string;
+  type: string;
+  size: number;
+}
+
+interface Education {
+  id: number;
+  qualification_type: string;
+  qualification: string;
+  university_institution: string;
+  cgpa_percentage: string;
+  year_of_passing: number;
+  certificate_name?: string;
+  documents?: string;
+}
+
+interface BGVData {
+  fresher: FresherInfo;
+  demographics: Demographics | null;
+  personal: Personal | null;
+  education: Education[];
+  submission: any;
 }
 
 export const HrBGVVerification = () => {
@@ -40,22 +103,20 @@ export const HrBGVVerification = () => {
   const navigate = useNavigate();
   
   const [loading, setLoading] = useState(true);
-  const [fresherInfo, setFresherInfo] = useState<FresherInfo | null>(null);
-  const [verifications, setVerifications] = useState<Record<string, DocumentVerification[]>>({});
-  const [selectedDocument, setSelectedDocument] = useState<DocumentVerification | null>(null);
-  const [rejectModalOpen, setRejectModalOpen] = useState(false);
-  const [rejectComments, setRejectComments] = useState('');
-  const [processing, setProcessing] = useState(false);
+  const [error, setError] = useState('');
+  const [bgvData, setBgvData] = useState<BGVData | null>(null);
+  const [activeTab, setActiveTab] = useState<'demographics' | 'personal' | 'education'>('demographics');
+  const [selectedImage, setSelectedImage] = useState<string | null>(null);
+  const [showImageModal, setShowImageModal] = useState(false);
 
   useEffect(() => {
     if (fresherId) {
-      fetchVerificationData();
+      fetchBGVData();
     }
   }, [fresherId]);
 
-  const fetchVerificationData = async () => {
+  const fetchBGVData = async () => {
     try {
-      setLoading(true);
       const token = localStorage.getItem('auth_token');
       
       const response = await fetch(`${API_BASE_URL}/bgv/hr/verification/${fresherId}`, {
@@ -64,24 +125,16 @@ export const HrBGVVerification = () => {
         }
       });
 
-      if (!response.ok) throw new Error('Failed to fetch verification data');
-
-      const data = await response.json();
-      
-      // Extract fresher info from first verification record
-      if (data.data.verifications.length > 0) {
-        const first = data.data.verifications[0];
-        setFresherInfo({
-          first_name: first.fresher_first_name,
-          last_name: first.fresher_last_name,
-          email: first.fresher_email,
-          designation: first.fresher_designation
-        });
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to fetch BGV data');
       }
-      
-      setVerifications(data.data.grouped || {});
-    } catch (error) {
-      console.error('Error fetching verification data:', error);
+
+      const result = await response.json();
+      setBgvData(result.data);
+    } catch (error: any) {
+      console.error('Error fetching BGV data:', error);
+      setError(error.message || 'Failed to load BGV data');
     } finally {
       setLoading(false);
     }

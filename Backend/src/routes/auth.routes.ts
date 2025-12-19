@@ -19,7 +19,13 @@ const router = Router();
  * Public authentication routes (with rate limiting)
  */
 
-// Microsoft authentication for HR
+// HR login with email and password (NEW)
+router.post('/hr/login',
+  authRateLimit,
+  AuthController.authenticateHRWithCredentials
+);
+
+// Microsoft authentication for HR (DEPRECATED - kept for backward compatibility)
 router.post('/microsoft', 
   authRateLimit,
   validateMicrosoftToken,
