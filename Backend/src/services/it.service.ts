@@ -1,6 +1,6 @@
 /**
  * IT Team Service
- * Handles IT team notifications and equipment requests
+ * Handles IT team notifications, equipment requests, and onboarding task tracking
  */
 
 interface ITUser {
@@ -21,6 +21,44 @@ interface NewUserNotification {
   designation: string;
   department: string;
   startDate: string;
+}
+
+export interface ItTask {
+  id: number;
+  fresher_id: number;
+  sent_to_it_date: Date;
+  work_email_generated: boolean;
+  laptop_allocated: boolean;
+  software_installed: boolean;
+  access_cards_issued: boolean;
+  training_scheduled: boolean;
+  hardware_accessories: boolean;
+  vpn_setup: boolean;
+  network_access_granted: boolean;
+  domain_account_created: boolean;
+  security_tools_configured: boolean;
+  notes?: string;
+  created_at: Date;
+  updated_at: Date;
+  
+  // Joined fresher data
+  fresher_name?: string;
+  email?: string;
+  role?: string;
+}
+
+export interface ItTaskUpdate {
+  work_email_generated?: boolean;
+  laptop_allocated?: boolean;
+  software_installed?: boolean;
+  access_cards_issued?: boolean;
+  training_scheduled?: boolean;
+  hardware_accessories?: boolean;
+  vpn_setup?: boolean;
+  network_access_granted?: boolean;
+  domain_account_created?: boolean;
+  security_tools_configured?: boolean;
+  notes?: string;
 }
 
 export class ITService {
@@ -224,6 +262,241 @@ export class ITService {
 
     } catch (error) {
       console.error('❌ Error setting up it_users table:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Send a fresher to IT for onboarding tasks
+   */
+  static async sendToIt(fresherId: number): Promise<ItTask> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+      
+      // Check if fresher exists
+      const fresherResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('SELECT id, first_name, last_name, email, designation FROM freshers WHERE id = @fresherId');
+      
+      if (fresherResult.recordset.length === 0) {
+        throw new Error('Fresher not found');
+      }
+      
+      // Check if already sent to IT
+      const existingTask = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('SELECT id FROM it_tasks WHERE fresher_id = @fresherId');
+      
+      if (existingTask.recordset.length > 0) {
+        throw new Error('This fresher has already been sent to IT');
+      }
+      
+      // Create IT task record
+      const result = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          INSERT INTO it_tasks (
+            fresher_id,
+            sent_to_it_date,
+            work_email_generated,
+            laptop_allocated,
+            software_installed,
+            access_cards_issued,
+            training_scheduled,
+            hardware_accessories,
+            vpn_setup,
+            network_access_granted,
+            domain_account_created,
+            security_tools_configured
+          )
+          OUTPUT INSERTED.*
+          VALUES (
+            @fresherId,
+            GETDATE(),
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0
+          )
+        `);
+      
+      return result.recordset[0];
+    } catch (error) {
+      console.error('Error sending to IT:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all IT tasks with fresher details
+   */
+  static async getAllItTasks(): Promise<ItTask[]> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      
+      const result = await pool.request().query(`
+        SELECT 
+          it.*,
+          CONCAT(f.first_name, ' ', f.last_name) as fresher_name,
+          f.email,
+          f.designation as role
+        FROM it_tasks it
+        INNER JOIN freshers f ON it.fresher_id = f.id
+        ORDER BY it.sent_to_it_date DESC
+      `);
+      
+      return result.recordset;
+    } catch (error) {
+      console.error('Error fetching IT tasks:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get IT task by ID
+   */
+  static async getItTaskById(id: number): Promise<ItTask | null> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+      
+      const result = await pool.request()
+        .input('id', mssql.Int, id)
+        .query(`
+          SELECT 
+            it.*,
+            CONCAT(f.first_name, ' ', f.last_name) as fresher_name,
+            f.email,
+            f.designation as role
+          FROM it_tasks it
+          INNER JOIN freshers f ON it.fresher_id = f.id
+          WHERE it.id = @id
+        `);
+      
+      return result.recordset.length > 0 ? result.recordset[0] : null;
+    } catch (error) {
+      console.error('Error fetching IT task by ID:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get IT task by fresher ID
+   */
+  static async getItTaskByFresherId(fresherId: number): Promise<ItTask | null> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+      
+      const result = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT 
+            it.*,
+            CONCAT(f.first_name, ' ', f.last_name) as fresher_name,
+            f.email,
+            f.designation as role
+          FROM it_tasks it
+          INNER JOIN freshers f ON it.fresher_id = f.id
+          WHERE it.fresher_id = @fresherId
+        `);
+      
+      return result.recordset.length > 0 ? result.recordset[0] : null;
+    } catch (error) {
+      console.error('Error fetching IT task by fresher ID:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update IT task status (for IT team to use)
+   */
+  static async updateItTask(id: number, updates: ItTaskUpdate): Promise<ItTask> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+      
+      // Build dynamic update query
+      const updateFields: string[] = [];
+      const request = pool.request().input('id', mssql.Int, id);
+      
+      Object.entries(updates).forEach(([key, value]) => {
+        if (value !== undefined) {
+          updateFields.push(`${key} = @${key}`);
+          if (typeof value === 'boolean') {
+            request.input(key, mssql.Bit, value);
+          } else {
+            request.input(key, mssql.NVarChar, value);
+          }
+        }
+      });
+      
+      if (updateFields.length === 0) {
+        throw new Error('No fields to update');
+      }
+      
+      const result = await request.query(`
+        UPDATE it_tasks 
+        SET ${updateFields.join(', ')}, updated_at = GETDATE()
+        OUTPUT INSERTED.*
+        WHERE id = @id
+      `);
+      
+      if (result.recordset.length === 0) {
+        throw new Error('IT task not found');
+      }
+      
+      return result.recordset[0];
+    } catch (error) {
+      console.error('Error updating IT task:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get task completion percentage for a fresher
+   */
+  static async getTaskCompletionPercentage(id: number): Promise<number> {
+    const task = await this.getItTaskById(id);
+    
+    if (!task) {
+      return 0;
+    }
+    
+    const taskFields = [
+      'work_email_generated',
+      'laptop_allocated',
+      'software_installed',
+      'access_cards_issued',
+      'training_scheduled',
+      'hardware_accessories',
+      'vpn_setup',
+      'network_access_granted',
+      'domain_account_created',
+      'security_tools_configured'
+    ];
+    
+    const completedTasks = taskFields.filter(field => task[field as keyof ItTask] === true).length;
+    return Math.round((completedTasks / taskFields.length) * 100);
+  }
+
+  /**
+   * Delete IT task (remove from IT progress)
+   */
+  static async deleteItTask(id: number): Promise<void> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+      
+      await pool.request()
+        .input('id', mssql.Int, id)
+        .query('DELETE FROM it_tasks WHERE id = @id');
+    } catch (error) {
+      console.error('Error deleting IT task:', error);
       throw error;
     }
   }

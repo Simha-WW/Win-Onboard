@@ -13,9 +13,11 @@ import {
   FiArrowRight,
   FiUser,
   FiCalendar,
-  FiBriefcase
+  FiBriefcase,
+  FiCpu
 } from 'react-icons/fi';
 import { API_BASE_URL } from '../../config';
+import { hrApiService } from '../../services/hrApi';
 
 interface BGVSubmission {
   submission_id: number;
@@ -125,6 +127,23 @@ export const HrDocumentsBGV = () => {
 
   const handleViewSubmission = (fresherId: number) => {
     navigate(`/hr/documents/${fresherId}`);
+  };
+
+  const handleSendToIT = async (fresherId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const confirmSend = window.confirm('Are you sure you want to send this candidate to IT team? This will initiate the IT onboarding process.');
+    if (!confirmSend) return;
+
+    try {
+      await hrApiService.sendToIt(fresherId);
+      alert('Successfully sent to IT team!');
+      // Refresh the submissions list
+      fetchSubmissions();
+    } catch (error: any) {
+      alert(error.message || 'Failed to send to IT team');
+      console.error('Error sending to IT:', error);
+    }
   };
 
   if (loading) {
@@ -395,34 +414,67 @@ export const HrDocumentsBGV = () => {
                   )}
                 </div>
 
-                {/* View Button */}
-                <button
-                  style={{
-                    width: '100%',
-                    padding: '10px',
-                    backgroundColor: '#2563eb',
-                    color: 'white',
-                    border: 'none',
-                    borderRadius: '8px',
-                    fontSize: '14px',
-                    fontWeight: '600',
-                    cursor: 'pointer',
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'center',
-                    gap: '8px',
-                    transition: 'background-color 0.2s'
-                  }}
-                  onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
-                  onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleViewSubmission(submission.fresher_id);
-                  }}
-                >
-                  View Documents
-                  <FiArrowRight />
-                </button>
+                {/* Action Buttons */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    style={{
+                      flex: 1,
+                      padding: '10px',
+                      backgroundColor: '#2563eb',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      gap: '8px',
+                      transition: 'background-color 0.2s'
+                    }}
+                    onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
+                    onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleViewSubmission(submission.fresher_id);
+                    }}
+                  >
+                    View Documents
+                    <FiArrowRight />
+                  </button>
+
+                  {/* Send to IT button - only show if all documents verified */}
+                  {submission.verified_count === submission.total_verifications && 
+                   submission.total_verifications > 0 && 
+                   submission.rejected_count === 0 && (
+                    <button
+                      style={{
+                        flex: 1,
+                        padding: '10px',
+                        backgroundColor: '#10b981',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '8px',
+                        transition: 'background-color 0.2s'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
+                      onClick={(e) => handleSendToIT(submission.fresher_id, e)}
+                      title="Send to IT for equipment and account setup"
+                    >
+                      Send to IT
+                      <FiCpu />
+                    </button>
+                  )}
+                </div>
               </div>
             );
           })}

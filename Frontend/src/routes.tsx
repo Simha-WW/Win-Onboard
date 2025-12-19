@@ -25,6 +25,7 @@ import { HrPreJoinTasks } from './pages/hr/HrPreJoinTasks';
 import { HrDocumentsBGV } from './pages/hr/HrDocumentsBGV';
 import { HrBGVVerification } from './pages/hr/HrBGVVerification';
 import { HrPoliciesTemplates } from './pages/hr/HrPoliciesTemplates';
+import { HrItProgress } from './pages/hr/HrItProgress';
 import { HrReportsExports } from './pages/hr/HrReportsExports';
 import { HrSettings } from './pages/hr/HrSettings';
 
@@ -121,6 +122,10 @@ export const router = createBrowserRouter([
       {
         path: 'policies',
         element: <HrPoliciesTemplates />
+      },
+      {
+        path: 'it-progress',
+        element: <HrItProgress />
       },
       {
         path: 'reports',
