@@ -20,7 +20,8 @@
     "db:migrate": "node db/migrate.js",
     "db:setup": "npm run db:migrate",
     "db:add-blob-storage": "node database_scripts/add-blob-storage-columns.js",
-    "db:add-blob-urls": "node database_scripts/add-blob-url-columns.js"
+    "db:add-blob-urls": "node database_scripts/add-blob-url-columns.js",
+    "db:add-educational-urls": "node database_scripts/add-educational-document-urls.js"
   },
   "keywords": [
     "hr",

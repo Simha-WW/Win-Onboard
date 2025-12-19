@@ -5,7 +5,7 @@
 
 import { BlobServiceClient, ContainerClient, BlobSASPermissions } from '@azure/storage-blob';
 import { v4 as uuidv4 } from 'uuid';
-import path from 'path';
+import * as path from 'path';
 
 interface UploadResult {
   blobName: string;

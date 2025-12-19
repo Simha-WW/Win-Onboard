@@ -19,6 +19,7 @@ import {
   FiBook
 } from 'react-icons/fi';
 import { API_BASE_URL } from '../../config';
+import { documentViewerService } from '../../services/documentViewer.service';
 
 interface FresherInfo {
   id: number;
@@ -165,6 +166,7 @@ export const HrBGVVerification = () => {
       if (result.data.demographics) {
         verificationsData['Demographics'] = Object.entries(result.data.demographics)
           .filter(([key]) => !['id', 'fresher_id'].includes(key))
+          .filter(([key]) => !key.toLowerCase().includes('file_data'))
           .map(([key, value]) => ({
             document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
             document_section: 'Demographics',
@@ -177,6 +179,7 @@ export const HrBGVVerification = () => {
       if (result.data.personal) {
         verificationsData['Personal'] = Object.entries(result.data.personal)
           .filter(([key]) => !['id', 'fresher_id'].includes(key))
+          .filter(([key]) => !key.toLowerCase().includes('file_data'))
           .map(([key, value]) => ({
             document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
             document_section: 'Personal',
@@ -190,6 +193,7 @@ export const HrBGVVerification = () => {
         verificationsData['Education'] = result.data.education.flatMap((edu: Education) => 
           Object.entries(edu)
             .filter(([key]) => !['id', 'fresher_id'].includes(key))
+            .filter(([key]) => !key.toLowerCase().includes('file_data'))
             .map(([key, value]) => ({
               document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
               document_section: 'Education',
@@ -239,6 +243,7 @@ export const HrBGVVerification = () => {
       if (result.data.demographics) {
         verificationsData['Demographics'] = Object.entries(result.data.demographics)
           .filter(([key]) => !['id', 'fresher_id'].includes(key))
+          .filter(([key]) => !key.toLowerCase().includes('file_data'))
           .map(([key, value]) => ({
             document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
             document_section: 'Demographics',
@@ -251,6 +256,7 @@ export const HrBGVVerification = () => {
       if (result.data.personal) {
         verificationsData['Personal'] = Object.entries(result.data.personal)
           .filter(([key]) => !['id', 'fresher_id'].includes(key))
+          .filter(([key]) => !key.toLowerCase().includes('file_data'))
           .map(([key, value]) => ({
             document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
             document_section: 'Personal',
@@ -264,6 +270,7 @@ export const HrBGVVerification = () => {
         verificationsData['Education'] = result.data.education.flatMap((edu: Education) => 
           Object.entries(edu)
             .filter(([key]) => !['id', 'fresher_id'].includes(key))
+            .filter(([key]) => !key.toLowerCase().includes('file_data'))
             .map(([key, value]) => ({
               document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
               document_section: 'Education',
@@ -427,9 +434,24 @@ export const HrBGVVerification = () => {
   const isDocumentField = (fieldName: string, value: any) => {
     if (!value) return false;
     
-    // Check if field name suggests it's a document
-    const docFieldNames = ['documents', 'certificate', 'attachment', 'file'];
-    const isDocField = docFieldNames.some(name => fieldName.toLowerCase().includes(name));
+    // Only show document viewer for these specific fields
+    const documentUrlFields = [
+      'aadhaar_doc_file_url',
+      'pan_file_url', 
+      'resume_file_url',
+      'documents',
+      'document_urls'
+    ];
+    
+    // Check if this is one of the designated document fields
+    const isDesignatedDocField = documentUrlFields.some(field => 
+      fieldName.toLowerCase().includes(field.toLowerCase())
+    );
+    
+    if (!isDesignatedDocField) return false;
+    
+    // Check if value is a blob URL
+    if (documentViewerService.isBlobUrl(value)) return true;
     
     // Check if value looks like base64 or binary data
     if (typeof value === 'string') {
@@ -442,7 +464,17 @@ export const HrBGVVerification = () => {
       // Check for Buffer-like object in string format
       const isBufferLike = value.startsWith('{') && value.includes('"type":"Buffer"');
       
-      return isDocField || isBase64Like || isBufferLike;
+      // Check if it's a JSON array of document objects (with fileUrl or data)
+      try {
+        const parsed = JSON.parse(value);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          if (parsed[0].fileUrl || parsed[0].data) return true;
+        }
+      } catch {
+        // Not JSON, continue with other checks
+      }
+      
+      return isBase64Like || isBufferLike;
     }
     
     // Check for Buffer object
@@ -453,8 +485,16 @@ export const HrBGVVerification = () => {
     return false;
   };
 
-  const handleViewDocument = (value: any, docType: string) => {
+  const handleViewDocument = async (value: any, docType: string) => {
     try {
+      // Check if value is a blob URL
+      if (documentViewerService.isBlobUrl(value)) {
+        const fileName = documentViewerService.extractFileName(value);
+        await documentViewerService.viewBlobDocument(value, fileName);
+        return;
+      }
+
+      // Legacy handling for base64 documents
       let documentUrl = '';
       
       if (typeof value === 'string') {
@@ -465,8 +505,17 @@ export const HrBGVVerification = () => {
           // Try to parse as JSON first (might be array of documents)
           try {
             const parsed = JSON.parse(value);
-            if (Array.isArray(parsed) && parsed.length > 0 && parsed[0].data) {
-              documentUrl = parsed[0].data;
+            if (Array.isArray(parsed) && parsed.length > 0) {
+              // Check if it's an array of blob URLs
+              if (parsed[0].fileUrl) {
+                await documentViewerService.viewBlobDocument(
+                  parsed[0].fileUrl, 
+                  parsed[0].fileName || 'Document'
+                );
+                return;
+              } else if (parsed[0].data) {
+                documentUrl = parsed[0].data;
+              }
             }
           } catch {
             // Assume it's base64 encoded, try to determine type
@@ -482,9 +531,9 @@ export const HrBGVVerification = () => {
       } else {
         alert('Unable to display document');
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error viewing document:', error);
-      alert('Error opening document');
+      alert(error.message || 'Error opening document');
     }
   };
 
@@ -492,6 +541,11 @@ export const HrBGVVerification = () => {
     if (value === null || value === undefined) return 'Not provided';
     if (typeof value === 'boolean') return value ? 'Yes' : 'No';
     if (typeof value === 'object') return JSON.stringify(value);
+    
+    // Don't display file_data columns
+    if (fieldName.toLowerCase().includes('file_data')) {
+      return null;
+    }
     
     // Don't display raw binary/document data
     if (isDocumentField(fieldName, value)) {
@@ -725,6 +779,19 @@ export const HrBGVVerification = () => {
                                 <FiEye />
                                 View Document
                               </button>
+                            ) : documentViewerService.isBlobUrl(doc.document_value) ? (
+                              <a
+                                href={doc.document_value}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  color: '#3b82f6',
+                                  textDecoration: 'underline',
+                                  wordBreak: 'break-all'
+                                }}
+                              >
+                                {doc.document_value}
+                              </a>
                             ) : (
                               formatValue(doc.document_value, doc.document_type)
                             )}

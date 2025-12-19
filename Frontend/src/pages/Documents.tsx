@@ -95,7 +95,9 @@ export const Documents = () => {
         university_institution: '',
         cgpa_percentage: '',
         year_of_passing: '',
-        documents: []
+        documentUrl: '',
+        documentName: '',
+        uploadingDocument: false
       }],
       additionalQualifications: []
     },
@@ -273,7 +275,9 @@ export const Documents = () => {
                     university_institution: '',
                     cgpa_percentage: '',
                     year_of_passing: '',
-                    documents: []
+                    documentUrl: '',
+                    documentName: '',
+                    uploadingDocument: false
                   }];
 
               console.log('📋 Setting qualifications to:', educationalQualifications);
@@ -587,7 +591,9 @@ export const Documents = () => {
             university_institution: '',
             cgpa_percentage: '',
             year_of_passing: '',
-            documents: []
+            documentUrl: '',
+            documentName: '',
+            uploadingDocument: false
           }
         ]
       }
@@ -625,41 +631,26 @@ export const Documents = () => {
     if (!files || files.length === 0) return;
 
     try {
-      const fileArray = Array.from(files);
-      const validFiles = fileArray.filter(file => {
-        const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-        const maxSize = 5 * 1024 * 1024; // 5MB
-        
-        if (!validTypes.includes(file.type)) {
-          alert(`File ${file.name}: Invalid file type. Only PDF, JPG, JPEG, and PNG are allowed.`);
-          return false;
-        }
-        if (file.size > maxSize) {
-          alert(`File ${file.name}: File size exceeds 5MB limit.`);
-          return false;
-        }
-        return true;
-      });
+      const file = files[0]; // Only take the first file
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      
+      if (!validTypes.includes(file.type)) {
+        alert(`Invalid file type. Only PDF, JPG, JPEG, and PNG are allowed.`);
+        return;
+      }
+      if (file.size > maxSize) {
+        alert(`File size exceeds 5MB limit.`);
+        return;
+      }
 
-      if (validFiles.length === 0) return;
-
-      const documentPromises = validFiles.map(async (file) => {
-        const base64Data = await fileToBase64(file);
-        return {
-          name: file.name,
-          data: base64Data,
-          type: file.type,
-          size: file.size
-        };
-      });
-
-      const documents = await Promise.all(documentPromises);
-
+      // Store file data (will be uploaded when form is saved)
       setFormData(prev => {
         const newQualifications = [...prev.education.qualifications];
         newQualifications[index] = {
           ...newQualifications[index],
-          documents: [...(newQualifications[index].documents || []), ...documents]
+          file: file,
+          documentName: file.name
         };
         return {
           ...prev,
@@ -669,9 +660,10 @@ export const Documents = () => {
           }
         };
       });
+
     } catch (error) {
-      console.error('Error uploading files:', error);
-      alert('Failed to upload files. Please try again.');
+      console.error('Error selecting file:', error);
+      alert('Failed to select file. Please try again.');
     }
   };
 
@@ -684,7 +676,9 @@ export const Documents = () => {
           ...(prev.education.additionalQualifications || []),
           {
             certificate_name: '',
-            documents: []
+            documentUrl: '',
+            documentName: '',
+            uploadingDocument: false
           }
         ]
       }
@@ -722,41 +716,26 @@ export const Documents = () => {
     if (!files || files.length === 0) return;
 
     try {
-      const fileArray = Array.from(files);
-      const validFiles = fileArray.filter(file => {
-        const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
-        const maxSize = 5 * 1024 * 1024; // 5MB
-        
-        if (!validTypes.includes(file.type)) {
-          alert(`File ${file.name}: Invalid file type. Only PDF, JPG, JPEG, and PNG are allowed.`);
-          return false;
-        }
-        if (file.size > maxSize) {
-          alert(`File ${file.name}: File size exceeds 5MB limit.`);
-          return false;
-        }
-        return true;
-      });
+      const file = files[0]; // Only take the first file
+      const validTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      
+      if (!validTypes.includes(file.type)) {
+        alert(`Invalid file type. Only PDF, JPG, JPEG, and PNG are allowed.`);
+        return;
+      }
+      if (file.size > maxSize) {
+        alert(`File size exceeds 5MB limit.`);
+        return;
+      }
 
-      if (validFiles.length === 0) return;
-
-      const documentPromises = validFiles.map(async (file) => {
-        const base64Data = await fileToBase64(file);
-        return {
-          name: file.name,
-          data: base64Data,
-          type: file.type,
-          size: file.size
-        };
-      });
-
-      const documents = await Promise.all(documentPromises);
-
+      // Store file data (will be uploaded when form is saved)
       setFormData(prev => {
         const newQualifications = [...prev.education.additionalQualifications];
         newQualifications[index] = {
           ...newQualifications[index],
-          documents: [...(newQualifications[index].documents || []), ...documents]
+          file: file,
+          documentName: file.name
         };
         return {
           ...prev,
@@ -766,9 +745,10 @@ export const Documents = () => {
           }
         };
       });
+
     } catch (error) {
-      console.error('Error uploading files:', error);
-      alert('Failed to upload files. Please try again.');
+      console.error('Error selecting file:', error);
+      alert('Failed to select file. Please try again.');
     }
   };
 
@@ -805,7 +785,8 @@ export const Documents = () => {
           errors.push(`Qualification ${index + 1}: Year of Passing must be after 1950`);
         }
       }
-      if (!qual.documents || qual.documents.length === 0) {
+      // Document validation - check for file or documentUrl
+      if (!qual.file && !qual.documentUrl && !qual.documentName) {
         errors.push(`Qualification ${index + 1}: At least one document is required`);
       }
     });
@@ -816,7 +797,8 @@ export const Documents = () => {
         if (!cert.certificate_name || !cert.certificate_name.trim()) {
           errors.push(`Additional Qualification ${index + 1}: Certificate name is required`);
         }
-        if (!cert.documents || cert.documents.length === 0) {
+        // Document validation - check for file or documentUrl
+        if (!cert.file && !cert.documentUrl && !cert.documentName) {
           errors.push(`Additional Qualification ${index + 1}: At least one document is required`);
         }
       });
@@ -941,9 +923,53 @@ export const Documents = () => {
           break;
         case 'education':
           apiEndpoint = '/api/bgv/education';
+          
+          // Process educational qualifications with file uploads
+          const processedQualifications = await Promise.all(
+            (formData.education.qualifications || []).map(async (qual) => {
+              const processed = {
+                qualification: qual.qualification,
+                university_institution: qual.university_institution,
+                cgpa_percentage: qual.cgpa_percentage,
+                year_of_passing: qual.year_of_passing
+              };
+              
+              // If there's a file, convert to base64 and include metadata
+              if (qual.file) {
+                const base64Data = await fileToBase64(qual.file);
+                processed.file_data = base64Data;
+                processed.file_name = qual.file.name;
+                processed.file_type = qual.file.type;
+                processed.file_size = qual.file.size;
+              }
+              
+              return processed;
+            })
+          );
+          
+          // Process additional qualifications with file uploads
+          const processedAdditional = await Promise.all(
+            (formData.education.additionalQualifications || []).map(async (cert) => {
+              const processed = {
+                certificate_name: cert.certificate_name
+              };
+              
+              // If there's a file, convert to base64 and include metadata
+              if (cert.file) {
+                const base64Data = await fileToBase64(cert.file);
+                processed.file_data = base64Data;
+                processed.file_name = cert.file.name;
+                processed.file_type = cert.file.type;
+                processed.file_size = cert.file.size;
+              }
+              
+              return processed;
+            })
+          );
+          
           dataToSave = {
-            educationalQualifications: formData.education.qualifications || [],
-            additionalQualifications: formData.education.additionalQualifications || []
+            educationalQualifications: processedQualifications,
+            additionalQualifications: processedAdditional
           };
           break;
         case 'employment':
@@ -2494,14 +2520,13 @@ export const Documents = () => {
                           <td style={{ padding: '12px' }}>
                             <input
                               type="file"
-                              multiple
                               accept=".pdf,.jpg,.jpeg,.png"
                               onChange={(e) => handleEducationFileUpload(index, e.target.files)}
                               style={{ fontSize: '12px' }}
                             />
-                            {qual.documents && qual.documents.length > 0 && (
+                            {qual.documentName && (
                               <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
-                                {qual.documents.length} file(s) uploaded
+                                ✓ {qual.documentName}
                               </div>
                             )}
                           </td>
@@ -2587,14 +2612,13 @@ export const Documents = () => {
                           <td style={{ padding: '12px' }}>
                             <input
                               type="file"
-                              multiple
                               accept=".pdf,.jpg,.jpeg,.png"
                               onChange={(e) => handleAdditionalQualificationFileUpload(index, e.target.files)}
                               style={{ fontSize: '12px' }}
                             />
-                            {cert.documents && cert.documents.length > 0 && (
-                              <div style={{ fontSize: '12px', color: '#3b82f6', marginTop: '4px' }}>
-                                {cert.documents.length} file(s) uploaded
+                            {cert.documentName && (
+                              <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
+                                ✓ {cert.documentName}
                               </div>
                             )}
                           </td>
