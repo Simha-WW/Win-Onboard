@@ -23,13 +23,19 @@ class BlobUploadService {
    */
   async getUploadToken(
     fileName: string,
-    documentType: 'aadhaar' | 'pan' | 'resume',
+    documentType: 'aadhaar' | 'pan' | 'resume' | 'education',
     fresherId: number
   ): Promise<UploadTokenResponse> {
+    const token = localStorage.getItem('auth_token');
+    if (!token) {
+      throw new Error('Authentication token not found. Please login again.');
+    }
+
     const response = await fetch(`${this.baseUrl}/blob/upload-token`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
+        'Authorization': `Bearer ${token}`,
       },
       body: JSON.stringify({
         fileName,
@@ -49,25 +55,30 @@ class BlobUploadService {
   /**
    * Upload file directly to Azure Blob Storage
    * @param file File to upload
-   * @param documentType Type of document (aadhaar, pan, resume)
+   * @param documentType Type of document (aadhaar, pan, resume, education)
    * @param fresherId Fresher ID
    * @returns Blob URL of uploaded file
    */
   async uploadFile(
     file: File,
-    documentType: 'aadhaar' | 'pan' | 'resume',
+    documentType: 'aadhaar' | 'pan' | 'resume' | 'education',
     fresherId: number,
     onProgress?: (progress: number) => void
   ): Promise<string> {
     try {
+      console.log('🔵 Starting upload for:', { fileName: file.name, documentType, fresherId, fileSize: file.size });
+      
       // Step 1: Get SAS token from backend
+      console.log('🔵 Step 1: Requesting SAS token from backend...');
       const { sasUrl, blobName } = await this.getUploadToken(
         file.name,
         documentType,
         fresherId
       );
+      console.log('✅ SAS token received:', { blobName, sasUrlLength: sasUrl.length });
 
       // Step 2: Upload file directly to Azure Blob Storage
+      console.log('🔵 Step 2: Uploading to Azure Blob Storage...');
       const blockBlobClient = new BlockBlobClient(sasUrl);
       
       // Upload with progress tracking
@@ -75,6 +86,7 @@ class BlobUploadService {
         onProgress: (progress) => {
           if (onProgress) {
             const percentage = (progress.loadedBytes / file.size) * 100;
+            console.log(`📊 Upload progress: ${Math.round(percentage)}%`);
             onProgress(Math.round(percentage));
           }
         },
@@ -85,10 +97,18 @@ class BlobUploadService {
 
       // Return the permanent blob URL (without SAS token)
       const blobUrl = sasUrl.split('?')[0];
+      console.log('✅ Upload complete! Blob URL:', blobUrl);
       
       return blobUrl;
     } catch (error: any) {
-      console.error('Error uploading file to blob storage:', error);
+      console.error('❌ Error uploading file to blob storage:', error);
+      console.error('Error details:', {
+        name: error.name,
+        message: error.message,
+        code: error.code,
+        statusCode: error.statusCode,
+        stack: error.stack
+      });
       throw new Error(`Failed to upload ${documentType}: ${error.message}`);
     }
   }

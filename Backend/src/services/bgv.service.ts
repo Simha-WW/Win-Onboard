@@ -640,6 +640,9 @@ export class BGVService {
 
       // Upload files to blob storage if configured
       let aadhaarBlobName = null, panBlobName = null, resumeBlobName = null;
+      let aadhaarBlobUrl = null, panBlobUrl = null, resumeBlobUrl = null;
+      
+      console.log('🔧 Blob storage configured:', blobStorage.isConfigured());
       
       if (blobStorage.isConfigured()) {
         console.log('📤 Uploading documents to Azure Blob Storage...');
@@ -655,7 +658,9 @@ export class BGVService {
               'aadhaar'
             );
             aadhaarBlobName = result.blobName;
+            aadhaarBlobUrl = result.blobUrl;
             console.log(`✅ Aadhaar uploaded: ${aadhaarBlobName}`);
+            console.log(`   Aadhaar URL: ${aadhaarBlobUrl}`);
           }
         }
         
@@ -670,7 +675,9 @@ export class BGVService {
               'pan'
             );
             panBlobName = result.blobName;
+            panBlobUrl = result.blobUrl;
             console.log(`✅ PAN uploaded: ${panBlobName}`);
+            console.log(`   PAN URL: ${panBlobUrl}`);
           }
         }
         
@@ -685,7 +692,9 @@ export class BGVService {
               'resume'
             );
             resumeBlobName = result.blobName;
+            resumeBlobUrl = result.blobUrl;
             console.log(`✅ Resume uploaded: ${resumeBlobName}`);
+            console.log(`   Resume URL: ${resumeBlobUrl}`);
           }
         }
       }
@@ -729,15 +738,15 @@ export class BGVService {
               perm_state = @permState,
               perm_country = @permCountry,
               perm_pin_code = @permPinCode,
-              aadhaar_blob_name = CASE WHEN @aadhaarBlobName IS NOT NULL THEN @aadhaarBlobName ELSE aadhaar_blob_name END,
+              aadhaar_doc_file_url = CASE WHEN @aadhaarBlobUrl IS NOT NULL THEN @aadhaarBlobUrl ELSE aadhaar_doc_file_url END,
               aadhaar_file_name = CASE WHEN @aadhaarFileName IS NOT NULL THEN @aadhaarFileName ELSE aadhaar_file_name END,
               aadhaar_file_type = CASE WHEN @aadhaarFileType IS NOT NULL THEN @aadhaarFileType ELSE aadhaar_file_type END,
               aadhaar_file_size = CASE WHEN @aadhaarFileSize IS NOT NULL THEN @aadhaarFileSize ELSE aadhaar_file_size END,
-              pan_blob_name = CASE WHEN @panBlobName IS NOT NULL THEN @panBlobName ELSE pan_blob_name END,
+              pan_file_url = CASE WHEN @panBlobUrl IS NOT NULL THEN @panBlobUrl ELSE pan_file_url END,
               pan_file_name = CASE WHEN @panFileName IS NOT NULL THEN @panFileName ELSE pan_file_name END,
               pan_file_type = CASE WHEN @panFileType IS NOT NULL THEN @panFileType ELSE pan_file_type END,
               pan_file_size = CASE WHEN @panFileSize IS NOT NULL THEN @panFileSize ELSE pan_file_size END,
-              resume_blob_name = CASE WHEN @resumeBlobName IS NOT NULL THEN @resumeBlobName ELSE resume_blob_name END,
+              resume_file_url = CASE WHEN @resumeBlobUrl IS NOT NULL THEN @resumeBlobUrl ELSE resume_file_url END,
               resume_file_name = CASE WHEN @resumeFileName IS NOT NULL THEN @resumeFileName ELSE resume_file_name END,
               resume_file_type = CASE WHEN @resumeFileType IS NOT NULL THEN @resumeFileType ELSE resume_file_type END,
               resume_file_size = CASE WHEN @resumeFileSize IS NOT NULL THEN @resumeFileSize ELSE resume_file_size END,
@@ -833,10 +842,14 @@ export class BGVService {
           .input('resumeFileSize', mssql.Int, data.resume_file_size);
         
         if (blobStorage.isConfigured()) {
+          console.log('💾 Adding blob URL inputs to UPDATE request:');
+          console.log('   aadhaarBlobUrl:', aadhaarBlobUrl);
+          console.log('   panBlobUrl:', panBlobUrl);
+          console.log('   resumeBlobUrl:', resumeBlobUrl);
           request
-            .input('aadhaarBlobName', mssql.NVarChar(500), aadhaarBlobName)
-            .input('panBlobName', mssql.NVarChar(500), panBlobName)
-            .input('resumeBlobName', mssql.NVarChar(500), resumeBlobName);
+            .input('aadhaarBlobUrl', mssql.NVarChar(1000), aadhaarBlobUrl)
+            .input('panBlobUrl', mssql.NVarChar(1000), panBlobUrl)
+            .input('resumeBlobUrl', mssql.NVarChar(1000), resumeBlobUrl);
         } else {
           request
             .input('aadhaarFileData', mssql.VarBinary, convertFileDataToBuffer(data.aadhaar_file_data))
@@ -847,7 +860,51 @@ export class BGVService {
         await request.query(updateQuery);
       } else {
         // Insert new
-        await pool.request()
+        const insertQuery = blobStorage.isConfigured()
+          ? `
+            INSERT INTO bgv_demographics (
+              submission_id, fresher_id, salutation, first_name, middle_name, last_name,
+              name_for_records, dob_as_per_records, celebrated_dob, gender, blood_group,
+              whatsapp_number, linkedin_url, aadhaar_card_number, pan_card_number,
+              comm_house_number, comm_street_name, comm_city, comm_district, comm_state, comm_country, comm_pin_code,
+              perm_same_as_comm, perm_house_number, perm_street_name, perm_city, perm_district, perm_state, perm_country, perm_pin_code,
+              aadhaar_doc_file_url, aadhaar_file_name, aadhaar_file_type, aadhaar_file_size,
+              pan_file_url, pan_file_name, pan_file_type, pan_file_size,
+              resume_file_url, resume_file_name, resume_file_type, resume_file_size
+            ) VALUES (
+              @submissionId, @fresherId, @salutation, @firstName, @middleName, @lastName,
+              @nameForRecords, @dobAsPerRecords, @celebratedDob, @gender, @bloodGroup,
+              @whatsappNumber, @linkedinUrl, @aadhaarNumber, @panNumber,
+              @commHouseNumber, @commStreetName, @commCity, @commDistrict, @commState, @commCountry, @commPinCode,
+              @permSameAsComm, @permHouseNumber, @permStreetName, @permCity, @permDistrict, @permState, @permCountry, @permPinCode,
+              @aadhaarBlobUrl, @aadhaarFileName, @aadhaarFileType, @aadhaarFileSize,
+              @panBlobUrl, @panFileName, @panFileType, @panFileSize,
+              @resumeBlobUrl, @resumeFileName, @resumeFileType, @resumeFileSize
+            )
+          `
+          : `
+            INSERT INTO bgv_demographics (
+              submission_id, fresher_id, salutation, first_name, middle_name, last_name,
+              name_for_records, dob_as_per_records, celebrated_dob, gender, blood_group,
+              whatsapp_number, linkedin_url, aadhaar_card_number, pan_card_number,
+              comm_house_number, comm_street_name, comm_city, comm_district, comm_state, comm_country, comm_pin_code,
+              perm_same_as_comm, perm_house_number, perm_street_name, perm_city, perm_district, perm_state, perm_country, perm_pin_code,
+              aadhaar_file_data, aadhaar_file_name, aadhaar_file_type, aadhaar_file_size,
+              pan_file_data, pan_file_name, pan_file_type, pan_file_size,
+              resume_file_data, resume_file_name, resume_file_type, resume_file_size
+            ) VALUES (
+              @submissionId, @fresherId, @salutation, @firstName, @middleName, @lastName,
+              @nameForRecords, @dobAsPerRecords, @celebratedDob, @gender, @bloodGroup,
+              @whatsappNumber, @linkedinUrl, @aadhaarNumber, @panNumber,
+              @commHouseNumber, @commStreetName, @commCity, @commDistrict, @commState, @commCountry, @commPinCode,
+              @permSameAsComm, @permHouseNumber, @permStreetName, @permCity, @permDistrict, @permState, @permCountry, @permPinCode,
+              @aadhaarFileData, @aadhaarFileName, @aadhaarFileType, @aadhaarFileSize,
+              @panFileData, @panFileName, @panFileType, @panFileSize,
+              @resumeFileData, @resumeFileName, @resumeFileType, @resumeFileSize
+            )
+          `;
+        
+        const insertRequest = pool.request()
           .input('submissionId', mssql.Int, submissionId)
           .input('fresherId', mssql.Int, fresherId)
           .input('salutation', mssql.NVarChar(10), data.salutation)
@@ -878,40 +935,33 @@ export class BGVService {
           .input('permState', mssql.NVarChar(100), data.perm_state)
           .input('permCountry', mssql.NVarChar(100), data.perm_country)
           .input('permPinCode', mssql.NVarChar(10), data.perm_pin_code)
-          // File parameters
-          .input('aadhaarFileData', mssql.VarBinary, convertFileDataToBuffer(data.aadhaar_file_data))
           .input('aadhaarFileName', mssql.NVarChar(255), data.aadhaar_file_name)
           .input('aadhaarFileType', mssql.NVarChar(100), data.aadhaar_file_type)
           .input('aadhaarFileSize', mssql.Int, data.aadhaar_file_size)
-          .input('panFileData', mssql.VarBinary, convertFileDataToBuffer(data.pan_file_data))
           .input('panFileName', mssql.NVarChar(255), data.pan_file_name)
           .input('panFileType', mssql.NVarChar(100), data.pan_file_type)
           .input('panFileSize', mssql.Int, data.pan_file_size)
-          .input('resumeFileData', mssql.VarBinary, convertFileDataToBuffer(data.resume_file_data))
           .input('resumeFileName', mssql.NVarChar(255), data.resume_file_name)
           .input('resumeFileType', mssql.NVarChar(100), data.resume_file_type)
-          .input('resumeFileSize', mssql.Int, data.resume_file_size)
-          .query(`
-            INSERT INTO bgv_demographics (
-              submission_id, fresher_id, salutation, first_name, middle_name, last_name,
-              name_for_records, dob_as_per_records, celebrated_dob, gender, blood_group,
-              whatsapp_number, linkedin_url, aadhaar_card_number, pan_card_number,
-              comm_house_number, comm_street_name, comm_city, comm_district, comm_state, comm_country, comm_pin_code,
-              perm_same_as_comm, perm_house_number, perm_street_name, perm_city, perm_district, perm_state, perm_country, perm_pin_code,
-              aadhaar_file_data, aadhaar_file_name, aadhaar_file_type, aadhaar_file_size,
-              pan_file_data, pan_file_name, pan_file_type, pan_file_size,
-              resume_file_data, resume_file_name, resume_file_type, resume_file_size
-            ) VALUES (
-              @submissionId, @fresherId, @salutation, @firstName, @middleName, @lastName,
-              @nameForRecords, @dobAsPerRecords, @celebratedDob, @gender, @bloodGroup,
-              @whatsappNumber, @linkedinUrl, @aadhaarNumber, @panNumber,
-              @commHouseNumber, @commStreetName, @commCity, @commDistrict, @commState, @commCountry, @commPinCode,
-              @permSameAsComm, @permHouseNumber, @permStreetName, @permCity, @permDistrict, @permState, @permCountry, @permPinCode,
-              @aadhaarFileData, @aadhaarFileName, @aadhaarFileType, @aadhaarFileSize,
-              @panFileData, @panFileName, @panFileType, @panFileSize,
-              @resumeFileData, @resumeFileName, @resumeFileType, @resumeFileSize
-            )
-          `);
+          .input('resumeFileSize', mssql.Int, data.resume_file_size);
+        
+        if (blobStorage.isConfigured()) {
+          console.log('💾 Adding blob URL inputs to INSERT request:');
+          console.log('   aadhaarBlobUrl:', aadhaarBlobUrl);
+          console.log('   panBlobUrl:', panBlobUrl);
+          console.log('   resumeBlobUrl:', resumeBlobUrl);
+          insertRequest
+            .input('aadhaarBlobUrl', mssql.NVarChar(1000), aadhaarBlobUrl)
+            .input('panBlobUrl', mssql.NVarChar(1000), panBlobUrl)
+            .input('resumeBlobUrl', mssql.NVarChar(1000), resumeBlobUrl);
+        } else {
+          insertRequest
+            .input('aadhaarFileData', mssql.VarBinary, convertFileDataToBuffer(data.aadhaar_file_data))
+            .input('panFileData', mssql.VarBinary, convertFileDataToBuffer(data.pan_file_data))
+            .input('resumeFileData', mssql.VarBinary, convertFileDataToBuffer(data.resume_file_data));
+        }
+        
+        await insertRequest.query(insertQuery);
       }
 
       console.log(`✅ Demographics saved for submission ${submissionId}`);
@@ -1286,7 +1336,7 @@ export class BGVService {
           SELECT 
             id, fresher_id, qualification_type, qualification,
             university_institution, cgpa_percentage, year_of_passing,
-            certificate_name, documents
+            certificate_name, document_url, created_at, updated_at
           FROM educational_details 
           WHERE fresher_id = @fresherId
           ORDER BY id
@@ -1294,20 +1344,18 @@ export class BGVService {
 
       console.log('🔍 Raw educational data from DB:', result.recordset);
       
-      // Parse documents JSON for each record
+      // Map data to include documentUrl and documentName
       const educationalData = result.recordset.map(record => {
-        if (record.documents) {
-          try {
-            record.documents = JSON.parse(record.documents);
-            console.log('✅ Parsed documents for record', record.id, ':', record.documents);
-          } catch (e) {
-            console.error('❌ Error parsing documents for record', record.id, ':', e);
-            record.documents = [];
-          }
-        } else {
-          record.documents = [];
-        }
-        return record;
+        const mapped = {
+          ...record,
+          documentUrl: record.document_url || null,
+          documentName: record.document_url ? record.document_url.split('/').pop() : null
+        };
+        
+        // Remove the snake_case version to avoid confusion
+        delete mapped.document_url;
+        
+        return mapped;
       });
       
       return educationalData;
@@ -1336,8 +1384,26 @@ export class BGVService {
 
       // Insert educational qualifications
       for (const edu of educationalData) {
-        const documentsJson = JSON.stringify(edu.documents || []);
-        console.log('🔍 Educational qualification documents JSON:', documentsJson);
+        let documentUrl = null;
+        
+        // Upload file to blob storage if provided
+        if (edu.file_data && blobStorage.isConfigured()) {
+          console.log('📤 Uploading educational document to blob storage...');
+          const buffer = convertFileDataToBuffer(edu.file_data);
+          if (buffer) {
+            const result = await blobStorage.uploadDocument(
+              buffer,
+              edu.file_name || 'educational_document.pdf',
+              edu.file_type || 'application/pdf',
+              fresherId,
+              'education'
+            );
+            documentUrl = result.blobUrl;
+            console.log(`✅ Educational document uploaded: ${documentUrl}`);
+          }
+        }
+        
+        console.log('📎 Educational document URL:', documentUrl);
 
         await pool.request()
           .input('fresherId', mssql.Int, fresherId)
@@ -1346,35 +1412,55 @@ export class BGVService {
           .input('universityInstitution', mssql.NVarChar(500), edu.university_institution)
           .input('cgpaPercentage', mssql.NVarChar(50), edu.cgpa_percentage)
           .input('yearOfPassing', mssql.Int, edu.year_of_passing)
-          .input('documents', mssql.NVarChar(mssql.MAX), documentsJson)
+          .input('documentUrl', mssql.NVarChar(1000), documentUrl)
           .query(`
             INSERT INTO educational_details (
               fresher_id, qualification_type, qualification,
               university_institution, cgpa_percentage, year_of_passing,
-              documents
+              document_url
             ) VALUES (
               @fresherId, @qualificationType, @qualification,
               @universityInstitution, @cgpaPercentage, @yearOfPassing,
-              @documents
+              @documentUrl
             )
           `);
       }
 
       // Insert additional qualifications/certificates
       for (const cert of additionalData) {
-        const documentsJson = JSON.stringify(cert.documents || []);
-        console.log('🔍 Additional certificate documents JSON:', documentsJson);
+        let documentUrl = null;
+        
+        // Upload file to blob storage if provided
+        if (cert.file_data && blobStorage.isConfigured()) {
+          console.log('📤 Uploading certificate to blob storage...');
+          const buffer = convertFileDataToBuffer(cert.file_data);
+          if (buffer) {
+            const result = await blobStorage.uploadDocument(
+              buffer,
+              cert.file_name || 'certificate.pdf',
+              cert.file_type || 'application/pdf',
+              fresherId,
+              'certificate'
+            );
+            documentUrl = result.blobUrl;
+            console.log(`✅ Certificate uploaded: ${documentUrl}`);
+          }
+        }
+        
+        console.log('📎 Certificate URL:', documentUrl);
 
         await pool.request()
           .input('fresherId', mssql.Int, fresherId)
           .input('qualificationType', mssql.NVarChar(50), 'additional')
           .input('certificateName', mssql.NVarChar(500), cert.certificate_name)
-          .input('documents', mssql.NVarChar(mssql.MAX), documentsJson)
+          .input('documentUrl', mssql.NVarChar(1000), documentUrl)
           .query(`
             INSERT INTO educational_details (
-              fresher_id, qualification_type, certificate_name, documents
+              fresher_id, qualification_type, certificate_name, 
+              document_url
             ) VALUES (
-              @fresherId, @qualificationType, @certificateName, @documents
+              @fresherId, @qualificationType, @certificateName, 
+              @documentUrl
             )
           `);
       }
