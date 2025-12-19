@@ -18,7 +18,9 @@
     "postinstall": "npm run build",
     "db:test": "node db/cleanup.js",
     "db:migrate": "node db/migrate.js",
-    "db:setup": "npm run db:migrate"
+    "db:setup": "npm run db:migrate",
+    "db:add-blob-storage": "node database_scripts/add-blob-storage-columns.js",
+    "db:add-blob-urls": "node database_scripts/add-blob-url-columns.js"
   },
   "keywords": [
     "hr",
@@ -38,6 +40,7 @@
   },
   "dependencies": {
     "@azure/msal-node": "^3.8.4",
+    "@azure/storage-blob": "^12.17.0",
     "axios": "^1.13.2",
     "bcrypt": "^5.1.1",
     "compression": "^1.7.4",

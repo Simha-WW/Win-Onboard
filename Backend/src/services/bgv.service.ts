@@ -3,6 +3,8 @@
  * Handles document submissions, file uploads, and verification workflow
  */
 
+import { blobStorage } from './blob.service';
+
 interface BGVSubmission {
   id: number;
   fresher_id: number;
@@ -625,6 +627,69 @@ export class BGVService {
         dobValue: data.celebrated_dob
       });
 
+      // Get fresher_id from submission
+      const submissionResult = await pool.request()
+        .input('submissionId', mssql.Int, submissionId)
+        .query('SELECT fresher_id FROM bgv_submissions WHERE id = @submissionId');
+      
+      if (!submissionResult.recordset || submissionResult.recordset.length === 0) {
+        throw new Error('Submission not found');
+      }
+      
+      const fresherId = submissionResult.recordset[0].fresher_id;
+
+      // Upload files to blob storage if configured
+      let aadhaarBlobName = null, panBlobName = null, resumeBlobName = null;
+      
+      if (blobStorage.isConfigured()) {
+        console.log('📤 Uploading documents to Azure Blob Storage...');
+        
+        if (data.aadhaar_file_data) {
+          const buffer = convertFileDataToBuffer(data.aadhaar_file_data);
+          if (buffer) {
+            const result = await blobStorage.uploadDocument(
+              buffer,
+              data.aadhaar_file_name || 'aadhaar.pdf',
+              data.aadhaar_file_type || 'application/pdf',
+              fresherId,
+              'aadhaar'
+            );
+            aadhaarBlobName = result.blobName;
+            console.log(`✅ Aadhaar uploaded: ${aadhaarBlobName}`);
+          }
+        }
+        
+        if (data.pan_file_data) {
+          const buffer = convertFileDataToBuffer(data.pan_file_data);
+          if (buffer) {
+            const result = await blobStorage.uploadDocument(
+              buffer,
+              data.pan_file_name || 'pan.pdf',
+              data.pan_file_type || 'application/pdf',
+              fresherId,
+              'pan'
+            );
+            panBlobName = result.blobName;
+            console.log(`✅ PAN uploaded: ${panBlobName}`);
+          }
+        }
+        
+        if (data.resume_file_data) {
+          const buffer = convertFileDataToBuffer(data.resume_file_data);
+          if (buffer) {
+            const result = await blobStorage.uploadDocument(
+              buffer,
+              data.resume_file_name || 'resume.pdf',
+              data.resume_file_type || 'application/pdf',
+              fresherId,
+              'resume'
+            );
+            resumeBlobName = result.blobName;
+            console.log(`✅ Resume uploaded: ${resumeBlobName}`);
+          }
+        }
+      }
+
       // Check if demographics exist
       const existingResult = await pool.request()
         .input('submissionId', mssql.Int, submissionId)
@@ -632,8 +697,103 @@ export class BGVService {
 
       if (existingResult.recordset.length > 0) {
         // Update existing
-        await pool.request()
+        const updateQuery = blobStorage.isConfigured()
+          ? `
+            UPDATE bgv_demographics SET
+              fresher_id = @fresherId,
+              salutation = @salutation,
+              first_name = @firstName,
+              middle_name = @middleName,
+              last_name = @lastName,
+              name_for_records = @nameForRecords,
+              dob_as_per_records = @dobAsPerRecords,
+              celebrated_dob = @celebratedDob,
+              gender = @gender,
+              blood_group = @bloodGroup,
+              whatsapp_number = @whatsappNumber,
+              linkedin_url = @linkedinUrl,
+              aadhaar_card_number = @aadhaarNumber,
+              pan_card_number = @panNumber,
+              comm_house_number = @commHouseNumber,
+              comm_street_name = @commStreetName,
+              comm_city = @commCity,
+              comm_district = @commDistrict,
+              comm_state = @commState,
+              comm_country = @commCountry,
+              comm_pin_code = @commPinCode,
+              perm_same_as_comm = @permSameAsComm,
+              perm_house_number = @permHouseNumber,
+              perm_street_name = @permStreetName,
+              perm_city = @permCity,
+              perm_district = @permDistrict,
+              perm_state = @permState,
+              perm_country = @permCountry,
+              perm_pin_code = @permPinCode,
+              aadhaar_blob_name = CASE WHEN @aadhaarBlobName IS NOT NULL THEN @aadhaarBlobName ELSE aadhaar_blob_name END,
+              aadhaar_file_name = CASE WHEN @aadhaarFileName IS NOT NULL THEN @aadhaarFileName ELSE aadhaar_file_name END,
+              aadhaar_file_type = CASE WHEN @aadhaarFileType IS NOT NULL THEN @aadhaarFileType ELSE aadhaar_file_type END,
+              aadhaar_file_size = CASE WHEN @aadhaarFileSize IS NOT NULL THEN @aadhaarFileSize ELSE aadhaar_file_size END,
+              pan_blob_name = CASE WHEN @panBlobName IS NOT NULL THEN @panBlobName ELSE pan_blob_name END,
+              pan_file_name = CASE WHEN @panFileName IS NOT NULL THEN @panFileName ELSE pan_file_name END,
+              pan_file_type = CASE WHEN @panFileType IS NOT NULL THEN @panFileType ELSE pan_file_type END,
+              pan_file_size = CASE WHEN @panFileSize IS NOT NULL THEN @panFileSize ELSE pan_file_size END,
+              resume_blob_name = CASE WHEN @resumeBlobName IS NOT NULL THEN @resumeBlobName ELSE resume_blob_name END,
+              resume_file_name = CASE WHEN @resumeFileName IS NOT NULL THEN @resumeFileName ELSE resume_file_name END,
+              resume_file_type = CASE WHEN @resumeFileType IS NOT NULL THEN @resumeFileType ELSE resume_file_type END,
+              resume_file_size = CASE WHEN @resumeFileSize IS NOT NULL THEN @resumeFileSize ELSE resume_file_size END,
+              updated_at = GETUTCDATE()
+            WHERE submission_id = @submissionId
+          `
+          : `
+            UPDATE bgv_demographics SET
+              fresher_id = @fresherId,
+              salutation = @salutation,
+              first_name = @firstName,
+              middle_name = @middleName,
+              last_name = @lastName,
+              name_for_records = @nameForRecords,
+              dob_as_per_records = @dobAsPerRecords,
+              celebrated_dob = @celebratedDob,
+              gender = @gender,
+              blood_group = @bloodGroup,
+              whatsapp_number = @whatsappNumber,
+              linkedin_url = @linkedinUrl,
+              aadhaar_card_number = @aadhaarNumber,
+              pan_card_number = @panNumber,
+              comm_house_number = @commHouseNumber,
+              comm_street_name = @commStreetName,
+              comm_city = @commCity,
+              comm_district = @commDistrict,
+              comm_state = @commState,
+              comm_country = @commCountry,
+              comm_pin_code = @commPinCode,
+              perm_same_as_comm = @permSameAsComm,
+              perm_house_number = @permHouseNumber,
+              perm_street_name = @permStreetName,
+              perm_city = @permCity,
+              perm_district = @permDistrict,
+              perm_state = @permState,
+              perm_country = @permCountry,
+              perm_pin_code = @permPinCode,
+              aadhaar_file_data = CASE WHEN @aadhaarFileData IS NOT NULL THEN @aadhaarFileData ELSE aadhaar_file_data END,
+              aadhaar_file_name = CASE WHEN @aadhaarFileName IS NOT NULL THEN @aadhaarFileName ELSE aadhaar_file_name END,
+              aadhaar_file_type = CASE WHEN @aadhaarFileType IS NOT NULL THEN @aadhaarFileType ELSE aadhaar_file_type END,
+              aadhaar_file_size = CASE WHEN @aadhaarFileSize IS NOT NULL THEN @aadhaarFileSize ELSE aadhaar_file_size END,
+              pan_file_data = CASE WHEN @panFileData IS NOT NULL THEN @panFileData ELSE pan_file_data END,
+              pan_file_name = CASE WHEN @panFileName IS NOT NULL THEN @panFileName ELSE pan_file_name END,
+              pan_file_type = CASE WHEN @panFileType IS NOT NULL THEN @panFileType ELSE pan_file_type END,
+              pan_file_size = CASE WHEN @panFileSize IS NOT NULL THEN @panFileSize ELSE pan_file_size END,
+              resume_file_data = CASE WHEN @resumeFileData IS NOT NULL THEN @resumeFileData ELSE resume_file_data END,
+              resume_file_name = CASE WHEN @resumeFileName IS NOT NULL THEN @resumeFileName ELSE resume_file_name END,
+              resume_file_type = CASE WHEN @resumeFileType IS NOT NULL THEN @resumeFileType ELSE resume_file_type END,
+              resume_file_size = CASE WHEN @resumeFileSize IS NOT NULL THEN @resumeFileSize ELSE resume_file_size END,
+              updated_at = GETUTCDATE()
+            WHERE submission_id = @submissionId
+          `;
+        
+        const request = pool.request()
           .input('submissionId', mssql.Int, submissionId)
+          .input('fresherId', mssql.Int, fresherId)
           .input('salutation', mssql.NVarChar(10), data.salutation)
           .input('firstName', mssql.NVarChar(100), data.first_name)
           .input('middleName', mssql.NVarChar(100), data.middle_name)
@@ -662,66 +822,34 @@ export class BGVService {
           .input('permState', mssql.NVarChar(100), data.perm_state)
           .input('permCountry', mssql.NVarChar(100), data.perm_country)
           .input('permPinCode', mssql.NVarChar(10), data.perm_pin_code)
-          // File parameters
-          .input('aadhaarFileData', mssql.VarBinary, convertFileDataToBuffer(data.aadhaar_file_data))
           .input('aadhaarFileName', mssql.NVarChar(255), data.aadhaar_file_name)
           .input('aadhaarFileType', mssql.NVarChar(100), data.aadhaar_file_type)
           .input('aadhaarFileSize', mssql.Int, data.aadhaar_file_size)
-          .input('panFileData', mssql.VarBinary, convertFileDataToBuffer(data.pan_file_data))
           .input('panFileName', mssql.NVarChar(255), data.pan_file_name)
           .input('panFileType', mssql.NVarChar(100), data.pan_file_type)
           .input('panFileSize', mssql.Int, data.pan_file_size)
-          .input('resumeFileData', mssql.VarBinary, convertFileDataToBuffer(data.resume_file_data))
           .input('resumeFileName', mssql.NVarChar(255), data.resume_file_name)
           .input('resumeFileType', mssql.NVarChar(100), data.resume_file_type)
-          .input('resumeFileSize', mssql.Int, data.resume_file_size)
-          .query(`
-            UPDATE bgv_demographics SET
-              salutation = @salutation,
-              first_name = @firstName,
-              middle_name = @middleName,
-              last_name = @lastName,
-              name_for_records = @nameForRecords,
-              dob_as_per_records = @dobAsPerRecords,
-              celebrated_dob = @celebratedDob,
-              gender = @gender,
-              blood_group = @bloodGroup,
-              whatsapp_number = @whatsappNumber,
-              linkedin_url = @linkedinUrl,
-              aadhaar_card_number = @aadhaarNumber,
-              pan_card_number = @panNumber,
-              comm_house_number = @commHouseNumber,
-              comm_street_name = @commStreetName,
-              comm_city = @commCity,
-              comm_district = @commDistrict,
-              comm_state = @commState,
-              comm_country = @commCountry,
-              comm_pin_code = @commPinCode,
-              perm_same_as_comm = @permSameAsComm,
-              perm_house_number = @permHouseNumber,
-              perm_street_name = @permStreetName,
-              perm_city = @permCity,
-              perm_district = @permDistrict,
-              perm_state = @permState,
-              perm_country = @permCountry,
-              perm_pin_code = @permPinCode,              aadhaar_file_data = CASE WHEN @aadhaarFileData IS NOT NULL THEN @aadhaarFileData ELSE aadhaar_file_data END,
-              aadhaar_file_name = CASE WHEN @aadhaarFileName IS NOT NULL THEN @aadhaarFileName ELSE aadhaar_file_name END,
-              aadhaar_file_type = CASE WHEN @aadhaarFileType IS NOT NULL THEN @aadhaarFileType ELSE aadhaar_file_type END,
-              aadhaar_file_size = CASE WHEN @aadhaarFileSize IS NOT NULL THEN @aadhaarFileSize ELSE aadhaar_file_size END,
-              pan_file_data = CASE WHEN @panFileData IS NOT NULL THEN @panFileData ELSE pan_file_data END,
-              pan_file_name = CASE WHEN @panFileName IS NOT NULL THEN @panFileName ELSE pan_file_name END,
-              pan_file_type = CASE WHEN @panFileType IS NOT NULL THEN @panFileType ELSE pan_file_type END,
-              pan_file_size = CASE WHEN @panFileSize IS NOT NULL THEN @panFileSize ELSE pan_file_size END,
-              resume_file_data = CASE WHEN @resumeFileData IS NOT NULL THEN @resumeFileData ELSE resume_file_data END,
-              resume_file_name = CASE WHEN @resumeFileName IS NOT NULL THEN @resumeFileName ELSE resume_file_name END,
-              resume_file_type = CASE WHEN @resumeFileType IS NOT NULL THEN @resumeFileType ELSE resume_file_type END,
-              resume_file_size = CASE WHEN @resumeFileSize IS NOT NULL THEN @resumeFileSize ELSE resume_file_size END,              updated_at = GETUTCDATE()
-            WHERE submission_id = @submissionId
-          `);
+          .input('resumeFileSize', mssql.Int, data.resume_file_size);
+        
+        if (blobStorage.isConfigured()) {
+          request
+            .input('aadhaarBlobName', mssql.NVarChar(500), aadhaarBlobName)
+            .input('panBlobName', mssql.NVarChar(500), panBlobName)
+            .input('resumeBlobName', mssql.NVarChar(500), resumeBlobName);
+        } else {
+          request
+            .input('aadhaarFileData', mssql.VarBinary, convertFileDataToBuffer(data.aadhaar_file_data))
+            .input('panFileData', mssql.VarBinary, convertFileDataToBuffer(data.pan_file_data))
+            .input('resumeFileData', mssql.VarBinary, convertFileDataToBuffer(data.resume_file_data));
+        }
+        
+        await request.query(updateQuery);
       } else {
         // Insert new
         await pool.request()
           .input('submissionId', mssql.Int, submissionId)
+          .input('fresherId', mssql.Int, fresherId)
           .input('salutation', mssql.NVarChar(10), data.salutation)
           .input('firstName', mssql.NVarChar(100), data.first_name)
           .input('middleName', mssql.NVarChar(100), data.middle_name)
@@ -765,7 +893,7 @@ export class BGVService {
           .input('resumeFileSize', mssql.Int, data.resume_file_size)
           .query(`
             INSERT INTO bgv_demographics (
-              submission_id, salutation, first_name, middle_name, last_name,
+              submission_id, fresher_id, salutation, first_name, middle_name, last_name,
               name_for_records, dob_as_per_records, celebrated_dob, gender, blood_group,
               whatsapp_number, linkedin_url, aadhaar_card_number, pan_card_number,
               comm_house_number, comm_street_name, comm_city, comm_district, comm_state, comm_country, comm_pin_code,
@@ -774,7 +902,7 @@ export class BGVService {
               pan_file_data, pan_file_name, pan_file_type, pan_file_size,
               resume_file_data, resume_file_name, resume_file_type, resume_file_size
             ) VALUES (
-              @submissionId, @salutation, @firstName, @middleName, @lastName,
+              @submissionId, @fresherId, @salutation, @firstName, @middleName, @lastName,
               @nameForRecords, @dobAsPerRecords, @celebratedDob, @gender, @bloodGroup,
               @whatsappNumber, @linkedinUrl, @aadhaarNumber, @panNumber,
               @commHouseNumber, @commStreetName, @commCity, @commDistrict, @commState, @commCountry, @commPinCode,
@@ -948,6 +1076,17 @@ export class BGVService {
       console.log('🔍 Received personal data:', data);
       console.log('🔍 Emergency contacts to save:', data.emergency_contacts);
 
+      // Get fresher_id from submission
+      const submissionResult = await pool.request()
+        .input('submissionId', mssql.Int, submissionId)
+        .query('SELECT fresher_id FROM bgv_submissions WHERE id = @submissionId');
+      
+      if (!submissionResult.recordset || submissionResult.recordset.length === 0) {
+        throw new Error('Submission not found');
+      }
+      
+      const fresherId = submissionResult.recordset[0].fresher_id;
+
       // Map emergency contacts to use consistent field names
       const emergencyContacts = (data.emergency_contacts || []).map((contact: any) => ({
         contact_person_name: contact.name || contact.contact_person_name || '',
@@ -968,6 +1107,7 @@ export class BGVService {
         // Update existing
         await pool.request()
           .input('submissionId', mssql.Int, submissionId)
+          .input('fresherId', mssql.Int, fresherId)
           .input('maritalStatus', mssql.NVarChar(20), data.marital_status)
           .input('numChildren', mssql.Int, data.no_of_children || 0)
           .input('fatherName', mssql.NVarChar(100), data.father_name)
@@ -979,6 +1119,7 @@ export class BGVService {
           .input('emergencyContacts', mssql.NVarChar(mssql.MAX), emergencyContactsJson)
           .query(`
             UPDATE bgv_personal SET
+              fresher_id = @fresherId,
               marital_status = @maritalStatus,
               num_children = @numChildren,
               father_name = @fatherName,
@@ -995,6 +1136,7 @@ export class BGVService {
         // Insert new
         await pool.request()
           .input('submissionId', mssql.Int, submissionId)
+          .input('fresherId', mssql.Int, fresherId)
           .input('maritalStatus', mssql.NVarChar(20), data.marital_status)
           .input('numChildren', mssql.Int, data.no_of_children || 0)
           .input('fatherName', mssql.NVarChar(100), data.father_name)
@@ -1006,12 +1148,12 @@ export class BGVService {
           .input('emergencyContacts', mssql.NVarChar(mssql.MAX), emergencyContactsJson)
           .query(`
             INSERT INTO bgv_personal (
-              submission_id, marital_status, num_children,
+              submission_id, fresher_id, marital_status, num_children,
               father_name, father_dob, father_deceased,
               mother_name, mother_dob, mother_deceased,
               emergency_contacts
             ) VALUES (
-              @submissionId, @maritalStatus, @numChildren,
+              @submissionId, @fresherId, @maritalStatus, @numChildren,
               @fatherName, @fatherDob, @fatherDeceased,
               @motherName, @motherDob, @motherDeceased,
               @emergencyContacts

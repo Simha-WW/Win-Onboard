@@ -11,6 +11,7 @@ import { Router } from 'express';
 import { hrRoutes } from './hr.routes';
 import { authRoutes } from './auth.routes';
 import { bgvRoutes } from './bgv.routes';
+import blobRoutes from './blob.routes';
 
 const router = Router();
 
@@ -47,6 +48,13 @@ router.use('/hr', hrRoutes);
  * Mounted at: /api/bgv/*
  */
 router.use('/bgv', bgvRoutes);
+
+/**
+ * Blob Storage Routes
+ * Azure Blob Storage upload token generation
+ * Mounted at: /api/blob/*
+ */
+router.use('/blob', blobRoutes);
 
 /**
  * TODO: Add additional route modules as they are implemented
