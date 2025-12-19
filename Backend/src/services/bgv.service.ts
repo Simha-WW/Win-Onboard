@@ -1452,6 +1452,9 @@ export class BGVService {
       const { getMSSQLPool } = await import('../config/database');
       const pool = getMSSQLPool();
 
+      // First ensure the bgv_verifications table exists
+      await this.updateVerificationTableSchema();
+
       const result = await pool.request().query(`
         SELECT 
           bs.id as submission_id,
@@ -1464,17 +1467,18 @@ export class BGVService {
           f.last_name,
           f.email,
           f.designation,
-          f.date_of_joining,
-          -- Count verifications
-          (SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id AND status = 'verified') as verified_count,
-          (SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id AND status = 'rejected') as rejected_count,
-          (SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id) as total_verifications
+          f.joining_date,
+          -- Count verifications with COALESCE to handle NULL
+          COALESCE((SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id AND status = 'verified'), 0) as verified_count,
+          COALESCE((SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id AND status = 'rejected'), 0) as rejected_count,
+          COALESCE((SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id), 0) as total_verifications
         FROM bgv_submissions bs
         INNER JOIN freshers f ON bs.fresher_id = f.id
         WHERE bs.submission_status = 'submitted'
         ORDER BY bs.submitted_at DESC
       `);
 
+      console.log(`✅ Found ${result.recordset.length} submitted BGV forms`);
       return result.recordset;
     } catch (error) {
       console.error('Error fetching submitted BGV forms:', error);

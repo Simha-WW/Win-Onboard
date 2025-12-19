@@ -163,6 +163,59 @@ class EmailService {
   }
 
   /**
+   * Send generic email
+   * 
+   * @param options - Email options (to, subject, html, text)
+   * @returns {Promise<EmailSendResult>} Send result
+   */
+  async sendEmail(options: {
+    to: string;
+    subject: string;
+    html?: string;
+    text?: string;
+  }): Promise<EmailSendResult> {
+    if (!this.transporter) {
+      return {
+        success: false,
+        error: 'Email service not initialized'
+      };
+    }
+
+    try {
+      const mailOptions = {
+        from: {
+          name: process.env.FROM_EMAIL_NAME || 'HR Department',
+          address: process.env.FROM_EMAIL_ADDRESS || process.env.SMTP_USER || 'hr@company.com'
+        },
+        to: options.to,
+        subject: options.subject,
+        text: options.text,
+        html: options.html
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+      
+      console.log('Email sent successfully:', {
+        messageId: info.messageId,
+        recipient: options.to
+      });
+
+      return {
+        success: true,
+        messageId: info.messageId
+      };
+
+    } catch (error) {
+      console.error('Failed to send email:', error);
+      
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown email error'
+      };
+    }
+  }
+
+  /**
    * Generate plain text welcome email content
    */
   private generateWelcomeTextEmail(

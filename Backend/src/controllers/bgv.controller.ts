@@ -218,7 +218,7 @@ export class BGVController {
         success: true,
         message: 'Personal information saved successfully'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('❌ Error saving personal info:', error);
       console.error('❌ Error details:', error.message);
       console.error('❌ Error stack:', error.stack);
@@ -492,27 +492,6 @@ export class BGVController {
   }
 
   /**
-   * Get all BGV submissions for HR
-   * GET /api/bgv/hr/submissions
-   */
-  async getHRSubmissions(req: AuthenticatedRequest, res: Response): Promise<void> {
-    try {
-      const submissions = await BGVService.getAllSubmissions();
-
-      res.json({
-        success: true,
-        submissions
-      });
-    } catch (error) {
-      console.error('Error getting HR submissions:', error);
-      res.status(500).json({ 
-        success: false, 
-        message: 'Failed to get submissions' 
-      });
-    }
-  }
-
-  /**
    * Verify or reject a document
    * POST /api/bgv/hr/document/:documentId/verify
    */
@@ -605,18 +584,24 @@ export class BGVController {
   async getHRSubmissions(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
       console.log('📋 Fetching submitted BGV forms for HR review...');
+      console.log('User:', req.user);
 
       const submissions = await BGVService.getSubmittedBGVFormsForHR();
+      console.log(`✅ Successfully fetched ${submissions.length} submissions`);
 
       res.status(200).json({
         success: true,
         data: submissions
       });
-    } catch (error) {
-      console.error('Error fetching HR submissions:', error);
+    } catch (error: any) {
+      console.error('❌ Error fetching HR submissions:');
+      console.error('Error name:', error.name);
+      console.error('Error message:', error.message);
+      console.error('Error stack:', error.stack);
       res.status(500).json({
         success: false,
-        message: 'Failed to fetch submissions'
+        message: 'Failed to fetch submissions',
+        error: error.message
       });
     }
   }
@@ -627,7 +612,7 @@ export class BGVController {
    */
   async getVerificationStatus(req: AuthenticatedRequest, res: Response): Promise<void> {
     try {
-      const fresherId = parseInt(req.params.fresherId);
+      const fresherId = parseInt(req.params.fresherId!);
 
       if (isNaN(fresherId)) {
         res.status(400).json({

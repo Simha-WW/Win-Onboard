@@ -56,9 +56,9 @@ export const HrBGVVerification = () => {
   const fetchVerificationData = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
-      const response = await fetch(`${API_BASE_URL}/api/bgv/hr/verification/${fresherId}`, {
+      const response = await fetch(`${API_BASE_URL}/bgv/hr/verification/${fresherId}`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }
@@ -90,9 +90,9 @@ export const HrBGVVerification = () => {
   const handleVerify = async (doc: DocumentVerification) => {
     try {
       setProcessing(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
-      const response = await fetch(`${API_BASE_URL}/api/bgv/hr/verify`, {
+      const response = await fetch(`${API_BASE_URL}/bgv/hr/verify`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -133,9 +133,9 @@ export const HrBGVVerification = () => {
 
     try {
       setProcessing(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
-      const response = await fetch(`${API_BASE_URL}/api/bgv/hr/verify`, {
+      const response = await fetch(`${API_BASE_URL}/bgv/hr/verify`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -181,9 +181,9 @@ export const HrBGVVerification = () => {
 
     try {
       setProcessing(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
-      const response = await fetch(`${API_BASE_URL}/api/bgv/hr/send-email`, {
+      const response = await fetch(`${API_BASE_URL}/bgv/hr/send-email`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

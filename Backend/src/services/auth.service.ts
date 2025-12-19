@@ -277,13 +277,20 @@ export class AuthService {
       // Handle database connection issues with a fallback for development
       try {
         const query = `
-          SELECT id, email, first_name, last_name, username, designation, department, password_hash, password, status 
+          SELECT id, email, first_name, last_name, username, designation, department, password_hash, status 
           FROM freshers 
           WHERE username = @username
         `;
 
         const { getMSSQLPool } = await import('../config/database');
         const pool = getMSSQLPool();
+        
+        // Check if pool is connected
+        if (!pool || !pool.connected) {
+          console.log('⚠️ Database pool not connected, attempting to reconnect...');
+          throw new Error('Database connection not available');
+        }
+        
         const mssql = await import('mssql');
         
         const result = await pool.request()
@@ -303,8 +310,7 @@ export class AuthService {
           id: fresher.id, 
           username: fresher.username, 
           status: fresher.status,
-          hasPasswordHash: !!fresher.password_hash,
-          hasPlaintextPassword: !!fresher.password
+          hasPasswordHash: !!fresher.password_hash
         });
 
         // Check if account is active
@@ -316,20 +322,17 @@ export class AuthService {
           };
         }
 
-        // Verify password - try both hashed and plain text (for development)
-        let isPasswordValid = false;
-        
-        if (fresher.password_hash) {
-          // Try bcrypt comparison first
-          isPasswordValid = await bcrypt.compare(password, fresher.password_hash);
-          console.log('🔐 Bcrypt comparison result:', isPasswordValid);
+        // Verify password using bcrypt
+        if (!fresher.password_hash) {
+          console.log('❌ No password hash found for user:', username);
+          return {
+            success: false,
+            error: 'Account configuration error. Please contact support.'
+          };
         }
         
-        if (!isPasswordValid && fresher.password) {
-          // Fallback to plain text comparison for development
-          isPasswordValid = password === fresher.password;
-          console.log('🔓 Plain text comparison result:', isPasswordValid);
-        }
+        const isPasswordValid = await bcrypt.compare(password, fresher.password_hash);
+        console.log('🔐 Password verification result:', isPasswordValid);
 
         if (!isPasswordValid) {
           console.log('❌ Password verification failed for user:', username);
@@ -362,30 +365,13 @@ export class AuthService {
         };
         
       } catch (dbError: any) {
-        console.log('💥 Database connection failed, using development bypass for user:', username);
+        console.error('💥 Database query error:', dbError.message);
+        console.error('Full error:', dbError);
         
-        // Development bypass for specific user when database is unavailable
-        if (username === 'gaddam.lalithya' && password === '(X$uR7') {
-          console.log('🚀 Development bypass activated for user:', username);
-          
-          const user: User = {
-            id: '1',
-            email: 'gaddam.lalithya@company.com',
-            firstName: 'Lalithya',
-            lastName: 'Gaddam',
-            role: 'FRESHER',
-            department: 'Development',
-            username: username
-          };
-
-          const token = this.generateToken(user);
-          return { success: true, user, token };
-        }
-        
-        // If not the bypass user, return error
+        // Return specific error message
         return {
           success: false,
-          error: 'Database connection failed. Please try again later.'
+          error: 'Unable to authenticate. Please ensure the database connection is working or try again later.'
         };
       }
 

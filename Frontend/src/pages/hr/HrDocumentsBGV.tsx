@@ -47,9 +47,9 @@ export const HrDocumentsBGV = () => {
   const fetchSubmissions = async () => {
     try {
       setLoading(true);
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       
-      const response = await fetch(`${API_BASE_URL}/api/bgv/hr/submissions`, {
+      const response = await fetch(`${API_BASE_URL}/bgv/hr/submissions`, {
         headers: {
           'Authorization': `Bearer ${token}`
         }

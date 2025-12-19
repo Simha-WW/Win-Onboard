@@ -947,11 +947,23 @@ export const Documents = () => {
           };
           break;
         case 'employment':
-          apiEndpoint = '/api/bgv/employment';
-          dataToSave = formData.employment;
-          break;
+          // Employment section is not yet implemented, skip saving
+          console.log('⏭️ Employment section not implemented yet, skipping save');
+          setLoading(false);
+          return;
+        case 'passport':
+          // Passport section is not yet implemented, skip saving
+          console.log('⏭️ Passport section not implemented yet, skipping save');
+          setLoading(false);
+          return;
+        case 'banking':
+          // Banking section is not yet implemented, skip saving
+          console.log('⏭️ Banking section not implemented yet, skipping save');
+          setLoading(false);
+          return;
         default:
           console.log('No API endpoint for section:', section.id);
+          setLoading(false);
           return;
       }
 
@@ -1031,7 +1043,11 @@ export const Documents = () => {
     }
     
     await handleSave();
-    if (activeSection < sections.length - 1) {
+    
+    // If on last section, show submit confirmation instead of navigating
+    if (isLastSection) {
+      setShowSubmitConfirm(true);
+    } else if (activeSection < sections.length - 1) {
       setActiveSection(activeSection + 1);
     }
   };
@@ -1039,6 +1055,7 @@ export const Documents = () => {
   const handlePrevious = () => {
     if (activeSection > 0) {
       setActiveSection(activeSection - 1);
+      setShowSubmitConfirm(false);
     }
   };
 
@@ -2653,6 +2670,7 @@ export const Documents = () => {
   };
 
   const isLastSection = activeSection === sections.length - 1;
+  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false);
 
   return (
     <div style={{ padding: '20px', backgroundColor: 'white', minHeight: '500px' }}>
@@ -2773,7 +2791,7 @@ export const Documents = () => {
             {loading ? 'Saving...' : 'Save'}
           </button>
 
-          {isLastSection ? (
+          {showSubmitConfirm ? (
             <button
               onClick={handleSubmit}
               disabled={loading}
@@ -2805,7 +2823,7 @@ export const Documents = () => {
                 alignItems: 'center',
                 gap: '8px',
                 padding: '12px 20px',
-                backgroundColor: '#3b82f6',
+                backgroundColor: isLastSection ? '#dc2626' : '#3b82f6',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
@@ -2816,7 +2834,7 @@ export const Documents = () => {
                 transition: 'all 0.2s ease'
               }}
             >
-              {loading ? 'Saving...' : 'Next'}
+              {loading ? 'Saving...' : (isLastSection ? 'Review & Submit' : 'Next')}
               <FiArrowRight />
             </button>
           )}
