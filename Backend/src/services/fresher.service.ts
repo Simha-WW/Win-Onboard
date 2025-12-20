@@ -144,33 +144,8 @@ class FresherService {
         // 3. Or rollback the entire transaction
       }
 
-      // Step 6.5: Send equipment notification to IT team
-      try {
-        const { ITService } = await import('./it.service');
-        
-        // Calculate expected start date (typically next Monday or specified date)
-        const startDate = new Date();
-        startDate.setDate(startDate.getDate() + 7); // Assuming 1 week from creation
-        const formattedStartDate = startDate.toLocaleDateString('en-US', {
-          weekday: 'long',
-          year: 'numeric',
-          month: 'long',
-          day: 'numeric'
-        });
-
-        await ITService.sendEquipmentNotification({
-          fresherName: `${fresherRecord.firstName} ${fresherRecord.lastName}`,
-          fresherEmail: fresherRecord.email,
-          designation: fresherRecord.designation || 'Not specified',
-          department: fresherRecord.department || 'Not specified',
-          startDate: formattedStartDate
-        });
-
-        console.log('✅ IT equipment notification sent successfully');
-      } catch (itError) {
-        // Log IT notification failure but don't fail the entire process
-        console.error('⚠️ IT notification failed (non-critical):', itError);
-      }
+      // Note: IT equipment notification is now sent when HR clicks "Send to IT and Vendor" button
+      // in the Documents and BGV section, not during user creation
 
       // Step 7: Clear sensitive data from memory
       temporaryPassword = '';

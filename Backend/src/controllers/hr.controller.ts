@@ -208,6 +208,153 @@ class HrController {
     }
   }
 
+  /**
+   * Mark vendor verification as verified
+   * POST /api/hr/vendor-verify
+   */
+  async vendorVerify(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { fresherId } = req.body;
+
+      console.log('vendorVerify called with:', { fresherId, userId: req.user?.id });
+
+      if (!fresherId) {
+        res.status(400).json({
+          success: false,
+          message: 'Fresher ID is required'
+        });
+        return;
+      }
+
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      // Check if already verified
+      const existing = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('SELECT id FROM vendor_verified WHERE fresher_id = @fresherId');
+
+      if (existing.recordset.length > 0) {
+        res.status(400).json({
+          success: false,
+          message: 'This candidate is already marked as verified'
+        });
+        return;
+      }
+
+      // Parse user ID (could be string from JWT)
+      const hrUserId = typeof req.user.id === 'string' ? parseInt(req.user.id) : req.user.id;
+      
+      console.log('Inserting into vendor_verified:', { fresherId, hrUserId });
+
+      // Insert into vendor_verified table
+      await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .input('hrUserId', mssql.Int, hrUserId)
+        .query(`
+          INSERT INTO vendor_verified (fresher_id, verified_by, verified_at)
+          VALUES (@fresherId, @hrUserId, GETDATE())
+        `);
+
+      console.log('Successfully inserted into vendor_verified');
+
+      res.status(200).json({
+        success: true,
+        message: 'Candidate marked as verified successfully'
+      });
+
+    } catch (error) {
+      console.error('Controller error - vendorVerify:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Internal server error'
+      });
+    }
+  }
+
+  /**
+   * Mark vendor verification as rejected
+   * POST /api/hr/vendor-reject
+   */
+  async vendorReject(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const { fresherId, reason } = req.body;
+
+      console.log('vendorReject called with:', { fresherId, reason, userId: req.user?.id });
+
+      if (!fresherId) {
+        res.status(400).json({
+          success: false,
+          message: 'Fresher ID is required'
+        });
+        return;
+      }
+
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      // Check if already rejected
+      const existing = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('SELECT id FROM vendor_rejected WHERE fresher_id = @fresherId');
+
+      if (existing.recordset.length > 0) {
+        res.status(400).json({
+          success: false,
+          message: 'This candidate is already marked as rejected'
+        });
+        return;
+      }
+
+      // Parse user ID (could be string from JWT)
+      const hrUserId = typeof req.user.id === 'string' ? parseInt(req.user.id) : req.user.id;
+
+      console.log('Inserting into vendor_rejected:', { fresherId, hrUserId, reason });
+
+      // Insert into vendor_rejected table
+      await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .input('hrUserId', mssql.Int, hrUserId)
+        .input('reason', mssql.NVarChar, reason || null)
+        .query(`
+          INSERT INTO vendor_rejected (fresher_id, rejected_by, rejection_reason, rejected_at)
+          VALUES (@fresherId, @hrUserId, @reason, GETDATE())
+        `);
+
+      console.log('Successfully inserted into vendor_rejected');
+
+      res.status(200).json({
+        success: true,
+        message: 'Candidate marked as rejected successfully'
+      });
+
+    } catch (error) {
+      console.error('Controller error - vendorReject:', error);
+      res.status(500).json({
+        success: false,
+        message: error instanceof Error ? error.message : 'Internal server error'
+      });
+    }
+  }
+
   // TODO: Implement additional controller methods
   // TODO: updateFresher(req: Request, res: Response)
   // TODO: deleteFresher(req: Request, res: Response)

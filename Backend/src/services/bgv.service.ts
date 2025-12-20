@@ -1699,7 +1699,12 @@ export class BGVService {
           -- Count verifications with COALESCE to handle NULL
           COALESCE((SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id AND status = 'verified'), 0) as verified_count,
           COALESCE((SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id AND status = 'rejected'), 0) as rejected_count,
-          COALESCE((SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id), 0) as total_verifications
+          COALESCE((SELECT COUNT(*) FROM bgv_verifications WHERE fresher_id = f.id), 0) as total_verifications,
+          -- Check if IT task exists (sent to IT and vendor)
+          CASE WHEN EXISTS (SELECT 1 FROM it_tasks WHERE fresher_id = f.id) THEN 1 ELSE 0 END as sent_to_it,
+          -- Check vendor verification status
+          CASE WHEN EXISTS (SELECT 1 FROM vendor_verified WHERE fresher_id = f.id) THEN 1 ELSE 0 END as vendor_verified,
+          CASE WHEN EXISTS (SELECT 1 FROM vendor_rejected WHERE fresher_id = f.id) THEN 1 ELSE 0 END as vendor_rejected
         FROM bgv_submissions bs
         INNER JOIN freshers f ON bs.fresher_id = f.id
         WHERE bs.submission_status = 'submitted'

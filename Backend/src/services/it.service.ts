@@ -275,14 +275,16 @@ export class ITService {
       const pool = getMSSQLPool();
       const mssql = await import('mssql');
       
-      // Check if fresher exists
+      // Check if fresher exists and get their details
       const fresherResult = await pool.request()
         .input('fresherId', mssql.Int, fresherId)
-        .query('SELECT id, first_name, last_name, email, designation FROM freshers WHERE id = @fresherId');
+        .query('SELECT id, first_name, last_name, email, designation, department FROM freshers WHERE id = @fresherId');
       
       if (fresherResult.recordset.length === 0) {
         throw new Error('Fresher not found');
       }
+
+      const fresher = fresherResult.recordset[0];
       
       // Check if already sent to IT
       const existingTask = await pool.request()
@@ -291,6 +293,84 @@ export class ITService {
       
       if (existingTask.recordset.length > 0) {
         throw new Error('This fresher has already been sent to IT');
+      }
+
+      // Get documents from BGV demographics table
+      const docsResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT 
+            aadhaar_doc_file_url,
+            pan_file_url,
+            resume_file_url
+          FROM bgv_demographics 
+          WHERE fresher_id = @fresherId
+        `);
+
+      // Get education documents
+      const eduDocsResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT document_url
+          FROM educational_details 
+          WHERE fresher_id = @fresherId 
+          AND document_url IS NOT NULL
+        `);
+
+      const documents = docsResult.recordset[0] || {};
+      const educationDocumentUrls = eduDocsResult.recordset.map(doc => doc.document_url).filter(Boolean);
+
+      // Send email to IT team
+      try {
+        console.log('📧 Sending equipment notification to IT team...');
+        
+        // Calculate expected start date (typically next Monday or specified date)
+        const startDate = new Date();
+        startDate.setDate(startDate.getDate() + 7); // Assuming 1 week from now
+        const formattedStartDate = startDate.toLocaleDateString('en-US', {
+          weekday: 'long',
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        });
+
+        await this.sendEquipmentNotification({
+          fresherName: `${fresher.first_name} ${fresher.last_name}`,
+          fresherEmail: fresher.email,
+          designation: fresher.designation || 'Not specified',
+          department: fresher.department || 'Not specified',
+          startDate: formattedStartDate
+        });
+
+        console.log('✅ IT equipment notification sent successfully');
+      } catch (itError) {
+        // Log IT notification failure but don't fail the entire process
+        console.error('⚠️ IT notification failed (non-critical):', itError);
+      }
+
+      // Send email to vendor for document verification
+      try {
+        console.log('📧 Sending document verification request to vendor...');
+        
+        const { VendorService } = await import('./vendor.service');
+        
+        await VendorService.sendDocumentVerificationRequest({
+          fresherName: `${fresher.first_name} ${fresher.last_name}`,
+          fresherEmail: fresher.email,
+          designation: fresher.designation || 'Not specified',
+          department: fresher.department || 'Not specified',
+          documents: {
+            aadharUrl: documents.aadhaar_doc_file_url,
+            panCardUrl: documents.pan_file_url,
+            resumeUrl: documents.resume_file_url,
+            educationDocumentUrls: educationDocumentUrls
+          }
+        });
+
+        console.log('✅ Vendor document verification request sent successfully');
+      } catch (vendorError) {
+        // Log vendor notification failure but don't fail the entire process
+        console.error('⚠️ Vendor notification failed (non-critical):', vendorError);
       }
       
       // Create IT task record

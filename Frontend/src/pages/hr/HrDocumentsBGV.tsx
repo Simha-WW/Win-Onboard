@@ -34,6 +34,9 @@ interface BGVSubmission {
   verified_count: number;
   rejected_count: number;
   total_verifications: number;
+  sent_to_it: number;
+  vendor_verified: number;
+  vendor_rejected: number;
 }
 
 export const HrDocumentsBGV = () => {
@@ -69,6 +72,25 @@ export const HrDocumentsBGV = () => {
   };
 
   const getStatusBadge = (submission: BGVSubmission) => {
+    // Check vendor verification status first
+    if (submission.vendor_verified === 1) {
+      return {
+        label: 'Verified',
+        color: '#10b981',
+        bgColor: '#d1fae5',
+        icon: <FiCheckCircle />
+      };
+    }
+
+    if (submission.vendor_rejected === 1) {
+      return {
+        label: 'Rejected',
+        color: '#ef4444',
+        bgColor: '#fee2e2',
+        icon: <FiX />
+      };
+    }
+
     const total = submission.total_verifications;
     const verified = submission.verified_count;
     const rejected = submission.rejected_count;
@@ -121,6 +143,16 @@ export const HrDocumentsBGV = () => {
   const filteredSubmissions = submissions.filter(sub => {
     if (filter === 'all') return true;
     
+    // Filter based on vendor verification status
+    if (filter === 'verified') {
+      return sub.vendor_verified === 1;
+    }
+    
+    if (filter === 'rejected') {
+      return sub.vendor_rejected === 1;
+    }
+    
+    // For other filters, use the status badge
     const status = getStatusBadge(sub);
     return status.label.toLowerCase().replace(' ', '_') === filter;
   });
@@ -143,6 +175,66 @@ export const HrDocumentsBGV = () => {
     } catch (error: any) {
       alert(error.message || 'Failed to send to IT team');
       console.error('Error sending to IT:', error);
+    }
+  };
+
+  const handleVendorVerify = async (fresherId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const confirmVerify = window.confirm('Are you sure you want to mark this candidate as verified by vendor?');
+    if (!confirmVerify) return;
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/hr/vendor-verify`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fresherId })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to verify candidate');
+      }
+
+      alert('Candidate verified successfully!');
+      fetchSubmissions();
+    } catch (error: any) {
+      alert(error.message || 'Failed to verify candidate');
+      console.error('Error verifying candidate:', error);
+    }
+  };
+
+  const handleVendorReject = async (fresherId: number, e: React.MouseEvent) => {
+    e.stopPropagation();
+    
+    const reason = prompt('Please enter the reason for rejection:');
+    if (reason === null) return; // User cancelled
+    
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/hr/vendor-reject`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ fresherId, reason: reason || undefined })
+      });
+
+      if (!response.ok) {
+        const error = await response.json();
+        throw new Error(error.message || 'Failed to reject candidate');
+      }
+
+      alert('Candidate rejected successfully!');
+      fetchSubmissions();
+    } catch (error: any) {
+      alert(error.message || 'Failed to reject candidate');
+      console.error('Error rejecting candidate:', error);
     }
   };
 
@@ -415,23 +507,25 @@ export const HrDocumentsBGV = () => {
                 </div>
 
                 {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '8px' }}>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
+                  {/* View Documents Button */}
                   <button
                     style={{
-                      flex: 1,
-                      padding: '10px',
+                      width: '90px',
+                      padding: '7px 10px',
                       backgroundColor: '#2563eb',
                       color: 'white',
                       border: 'none',
-                      borderRadius: '8px',
-                      fontSize: '14px',
+                      borderRadius: '5px',
+                      fontSize: '12px',
                       fontWeight: '600',
                       cursor: 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
-                      gap: '8px',
-                      transition: 'background-color 0.2s'
+                      gap: '4px',
+                      transition: 'background-color 0.2s',
+                      whiteSpace: 'nowrap'
                     }}
                     onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
@@ -440,39 +534,175 @@ export const HrDocumentsBGV = () => {
                       handleViewSubmission(submission.fresher_id);
                     }}
                   >
-                    View Documents
-                    <FiArrowRight />
+                    View
+                    <FiArrowRight size={12} />
                   </button>
 
-                  {/* Send to IT button - only show if all documents verified */}
+                  {/* Send to IT button - only show if all documents verified and not sent yet */}
                   {submission.verified_count === submission.total_verifications && 
                    submission.total_verifications > 0 && 
-                   submission.rejected_count === 0 && (
-                    <button
+                   submission.rejected_count === 0 && 
+                   submission.vendor_verified === 0 &&
+                   submission.vendor_rejected === 0 && (
+                    submission.sent_to_it === 1 ? (
+                      <div
+                        style={{
+                          width: '90px',
+                          padding: '7px 10px',
+                          backgroundColor: '#6b7280',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '5px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          opacity: 0.8,
+                          whiteSpace: 'nowrap'
+                        }}
+                        title="Already sent to IT and Vendor"
+                      >
+                        Sent
+                        <FiCheckCircle size={12} />
+                      </div>
+                    ) : (
+                      <button
+                        style={{
+                          width: '90px',
+                          padding: '7px 10px',
+                          backgroundColor: '#10b981',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '5px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          transition: 'background-color 0.2s',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
+                        onClick={(e) => handleSendToIT(submission.fresher_id, e)}
+                        title="Send to IT and Vendor"
+                      >
+                        Send
+                        <FiCpu size={12} />
+                      </button>
+                    )
+                  )}
+
+                  {/* Vendor Verification Buttons - only show if sent to IT and vendor, and not yet verified/rejected */}
+                  {submission.sent_to_it === 1 && 
+                   submission.vendor_verified === 0 && 
+                   submission.vendor_rejected === 0 && (
+                    <>
+                      <button
+                        style={{
+                          width: '80px',
+                          padding: '7px 10px',
+                          backgroundColor: '#22c55e',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '5px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          transition: 'background-color 0.2s',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#16a34a'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#22c55e'}
+                        onClick={(e) => handleVendorVerify(submission.fresher_id, e)}
+                        title="Mark as verified by vendor"
+                      >
+                        <FiCheckCircle size={12} /> Verify
+                      </button>
+
+                      <button
+                        style={{
+                          width: '80px',
+                          padding: '7px 10px',
+                          backgroundColor: '#ef4444',
+                          color: 'white',
+                          border: 'none',
+                          borderRadius: '5px',
+                          fontSize: '12px',
+                          fontWeight: '600',
+                          cursor: 'pointer',
+                          display: 'flex',
+                          alignItems: 'center',
+                          justifyContent: 'center',
+                          gap: '4px',
+                          transition: 'background-color 0.2s',
+                          whiteSpace: 'nowrap'
+                        }}
+                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#dc2626'}
+                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#ef4444'}
+                        onClick={(e) => handleVendorReject(submission.fresher_id, e)}
+                        title="Reject candidate"
+                      >
+                        <FiX size={12} /> Reject
+                      </button>
+                    </>
+                  )}
+
+                  {/* Show status if vendor already verified or rejected */}
+                  {submission.vendor_verified === 1 && (
+                    <div
                       style={{
-                        flex: 1,
-                        padding: '10px',
-                        backgroundColor: '#10b981',
+                        width: '90px',
+                        padding: '7px 10px',
+                        backgroundColor: '#22c55e',
                         color: 'white',
                         border: 'none',
-                        borderRadius: '8px',
-                        fontSize: '14px',
+                        borderRadius: '5px',
+                        fontSize: '12px',
                         fontWeight: '600',
-                        cursor: 'pointer',
                         display: 'flex',
                         alignItems: 'center',
                         justifyContent: 'center',
-                        gap: '8px',
-                        transition: 'background-color 0.2s'
+                        gap: '4px',
+                        opacity: 0.8,
+                        whiteSpace: 'nowrap'
                       }}
-                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
-                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
-                      onClick={(e) => handleSendToIT(submission.fresher_id, e)}
-                      title="Send to IT for equipment and account setup"
+                      title="Verified by vendor"
                     >
-                      Send to IT
-                      <FiCpu />
-                    </button>
+                      <FiCheckCircle size={12} /> Verified
+                    </div>
+                  )}
+
+                  {submission.vendor_rejected === 1 && (
+                    <div
+                      style={{
+                        width: '90px',
+                        padding: '7px 10px',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        opacity: 0.8,
+                        whiteSpace: 'nowrap'
+                      }}
+                      title="Rejected by vendor"
+                    >
+                      <FiX size={12} /> Rejected
+                    </div>
                   )}
                 </div>
               </div>

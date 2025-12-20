@@ -23,14 +23,14 @@ export const sendToIt = async (req: Request, res: Response) => {
 
     const itTask = await ITService.sendToIt(fresherId);
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: 'Successfully sent to IT team',
       data: itTask
     });
   } catch (error: any) {
     console.error('Error in sendToIt controller:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message || 'Failed to send to IT'
     });
@@ -66,6 +66,12 @@ export const getAllItTasks = async (req: Request, res: Response) => {
 export const getItTaskById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Task ID is required'
+      });
+    }
     const taskId = parseInt(id, 10);
 
     if (isNaN(taskId)) {
@@ -87,7 +93,7 @@ export const getItTaskById = async (req: Request, res: Response) => {
     // Calculate completion percentage
     const completionPercentage = await ITService.getTaskCompletionPercentage(taskId);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: {
         ...task,
@@ -96,7 +102,7 @@ export const getItTaskById = async (req: Request, res: Response) => {
     });
   } catch (error: any) {
     console.error('Error in getItTaskById controller:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch IT task'
     });
@@ -110,6 +116,12 @@ export const getItTaskById = async (req: Request, res: Response) => {
 export const updateItTask = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Task ID is required'
+      });
+    }
     const taskId = parseInt(id, 10);
 
     if (isNaN(taskId)) {
@@ -131,14 +143,14 @@ export const updateItTask = async (req: Request, res: Response) => {
 
     const updatedTask = await ITService.updateItTask(taskId, updates);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'IT task updated successfully',
       data: updatedTask
     });
   } catch (error: any) {
     console.error('Error in updateItTask controller:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message || 'Failed to update IT task'
     });
@@ -152,6 +164,12 @@ export const updateItTask = async (req: Request, res: Response) => {
 export const deleteItTask = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
+    if (!id) {
+      return res.status(400).json({
+        success: false,
+        message: 'Task ID is required'
+      });
+    }
     const taskId = parseInt(id, 10);
 
     if (isNaN(taskId)) {
@@ -163,13 +181,13 @@ export const deleteItTask = async (req: Request, res: Response) => {
 
     await ITService.deleteItTask(taskId);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: 'IT task deleted successfully'
     });
   } catch (error: any) {
     console.error('Error in deleteItTask controller:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message || 'Failed to delete IT task'
     });
@@ -183,6 +201,12 @@ export const deleteItTask = async (req: Request, res: Response) => {
 export const getItTaskByFresherId = async (req: Request, res: Response) => {
   try {
     const { fresherId } = req.params;
+    if (!fresherId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Fresher ID is required'
+      });
+    }
     const id = parseInt(fresherId, 10);
 
     if (isNaN(id)) {
@@ -201,13 +225,13 @@ export const getItTaskByFresherId = async (req: Request, res: Response) => {
       });
     }
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       data: task
     });
   } catch (error: any) {
     console.error('Error in getItTaskByFresherId controller:', error);
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       message: error.message || 'Failed to fetch IT task'
     });

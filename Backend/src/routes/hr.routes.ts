@@ -38,6 +38,10 @@ router.get('/freshers/:id', hrController.getFresherById.bind(hrController));
 // Resend welcome email for specific fresher
 router.post('/freshers/:id/resend-email', hrController.resendWelcomeEmail.bind(hrController));
 
+// Vendor verification routes
+router.post('/vendor-verify', hrController.vendorVerify.bind(hrController));
+router.post('/vendor-reject', hrController.vendorReject.bind(hrController));
+
 // TODO: Implement additional routes when services are ready
 // router.put('/freshers/:id', hrController.updateFresher.bind(hrController));
 // router.delete('/freshers/:id', hrController.deleteFresher.bind(hrController));

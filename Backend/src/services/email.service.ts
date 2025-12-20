@@ -605,6 +605,337 @@ This is an automated notification from the onboarding system.
     `.trim();
   }
 
+  /**
+   * Send document verification request to vendor
+   */
+  async sendVendorDocumentVerification({
+    vendorEmail,
+    vendorName,
+    fresherName,
+    fresherEmail,
+    designation,
+    department,
+    documents
+  }: {
+    vendorEmail: string;
+    vendorName: string;
+    fresherName: string;
+    fresherEmail: string;
+    designation: string;
+    department: string;
+    documents: {
+      aadharUrl?: string;
+      panCardUrl?: string;
+      resumeUrl?: string;
+      certificateUrl?: string;
+      educationDocumentUrls?: string[];
+    };
+  }): Promise<EmailSendResult> {
+    try {
+      const instance = new EmailService();
+      
+      if (!instance.transporter) {
+        return {
+          success: false,
+          error: 'Email service not initialized'
+        };
+      }
+
+      const subject = `📄 Document Verification Request - ${fresherName}`;
+      
+      const htmlContent = instance.generateVendorVerificationHTML({
+        vendorName,
+        fresherName,
+        fresherEmail,
+        designation,
+        department,
+        documents
+      });
+
+      const mailOptions = {
+        from: `"HR Department" <${process.env.SMTP_USER}>`,
+        to: vendorEmail,
+        subject: subject,
+        html: htmlContent,
+        text: `
+Document Verification Request
+
+Dear ${vendorName},
+
+We request your services to verify the authenticity and originality of documents submitted by one of our new employees.
+
+Employee Details:
+- Name: ${fresherName}
+- Email: ${fresherEmail}
+- Designation: ${designation}
+- Department: ${department}
+
+Documents for Verification:
+${documents.aadharUrl ? '✓ Aadhar Card' : ''}
+${documents.panCardUrl ? '✓ PAN Card' : ''}
+${documents.resumeUrl ? '✓ Resume' : ''}
+${documents.certificateUrl ? '✓ Certificate' : ''}
+${documents.educationDocumentUrls && documents.educationDocumentUrls.length > 0 ? `✓ Education Documents (${documents.educationDocumentUrls.length})` : ''}
+
+Please access the documents using the links provided in the HTML version of this email and verify their originality. Kindly provide your verification report at your earliest convenience.
+
+Thank you for your assistance.
+
+Best regards,
+HR Department
+
+This is an automated notification from the onboarding system.
+        `.trim()
+      };
+
+      const info = await instance.transporter.sendMail(mailOptions);
+      
+      console.log(`✅ Vendor verification email sent to: ${vendorEmail}`);
+      console.log(`📧 Message ID: ${info.messageId}`);
+      
+      return {
+        success: true,
+        messageId: info.messageId
+      };
+
+    } catch (error) {
+      console.error('❌ Failed to send vendor verification email:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Generate HTML content for vendor document verification request
+   */
+  private generateVendorVerificationHTML({
+    vendorName,
+    fresherName,
+    fresherEmail,
+    designation,
+    department,
+    documents
+  }: {
+    vendorName: string;
+    fresherName: string;
+    fresherEmail: string;
+    designation: string;
+    department: string;
+    documents: {
+      aadharUrl?: string;
+      panCardUrl?: string;
+      resumeUrl?: string;
+      certificateUrl?: string;
+      educationDocumentUrls?: string[];
+    };
+  }): string {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Document Verification Request</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            line-height: 1.6;
+            color: #333;
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+            background-color: #f8f9fa;
+        }
+        .container {
+            background-color: #ffffff;
+            padding: 40px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 30px;
+            padding-bottom: 20px;
+            border-bottom: 2px solid #6f42c1;
+        }
+        .header h1 {
+            color: #6f42c1;
+            margin: 0;
+            font-size: 28px;
+        }
+        .greeting {
+            font-size: 18px;
+            margin-bottom: 20px;
+        }
+        .employee-details {
+            background-color: #f8f9fa;
+            border-left: 4px solid #6f42c1;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .employee-details h3 {
+            color: #6f42c1;
+            margin-top: 0;
+        }
+        .detail-row {
+            margin: 10px 0;
+        }
+        .detail-label {
+            font-weight: bold;
+            color: #495057;
+        }
+        .documents-section {
+            background-color: #e8f4f8;
+            border-left: 4px solid #0d6efd;
+            padding: 20px;
+            margin: 20px 0;
+        }
+        .documents-section h3 {
+            color: #0d6efd;
+            margin-top: 0;
+        }
+        .document-item {
+            padding: 12px;
+            margin: 10px 0;
+            background-color: white;
+            border-radius: 5px;
+            border: 1px solid #dee2e6;
+        }
+        .document-item a {
+            color: #0d6efd;
+            text-decoration: none;
+            font-weight: 500;
+        }
+        .document-item a:hover {
+            text-decoration: underline;
+        }
+        .document-label {
+            font-weight: bold;
+            color: #495057;
+            display: block;
+            margin-bottom: 5px;
+        }
+        .verification-request {
+            background-color: #fff3cd;
+            border: 1px solid #ffeaa7;
+            border-radius: 5px;
+            padding: 15px;
+            margin: 20px 0;
+        }
+        .verification-request h4 {
+            color: #856404;
+            margin-top: 0;
+        }
+        .footer {
+            text-align: center;
+            margin-top: 30px;
+            padding-top: 20px;
+            border-top: 1px solid #dee2e6;
+            font-size: 14px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📄 Document Verification Request</h1>
+            <p>Employee Background Verification</p>
+        </div>
+        
+        <div class="greeting">
+            <p>Dear ${vendorName},</p>
+        </div>
+        
+        <p>We request your professional services to verify the authenticity and originality of documents submitted by one of our new employees as part of our background verification process.</p>
+        
+        <div class="employee-details">
+            <h3>👤 Employee Information</h3>
+            <div class="detail-row">
+                <span class="detail-label">Name:</span> ${fresherName}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Email:</span> ${fresherEmail}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Designation:</span> ${designation}
+            </div>
+            <div class="detail-row">
+                <span class="detail-label">Department:</span> ${department}
+            </div>
+        </div>
+        
+        <div class="documents-section">
+            <h3>📋 Documents for Verification</h3>
+            <p>Please verify the following documents for authenticity:</p>
+            
+            ${documents.aadharUrl ? `
+            <div class="document-item">
+                <span class="document-label">🆔 Aadhar Card</span>
+                <a href="${documents.aadharUrl}" target="_blank">View Aadhar Document →</a>
+            </div>
+            ` : ''}
+            
+            ${documents.panCardUrl ? `
+            <div class="document-item">
+                <span class="document-label">💳 PAN Card</span>
+                <a href="${documents.panCardUrl}" target="_blank">View PAN Card →</a>
+            </div>
+            ` : ''}
+            
+            ${documents.resumeUrl ? `
+            <div class="document-item">
+                <span class="document-label">📝 Resume</span>
+                <a href="${documents.resumeUrl}" target="_blank">View Resume →</a>
+            </div>
+            ` : ''}
+            
+            ${documents.certificateUrl ? `
+            <div class="document-item">
+                <span class="document-label">🎓 Certificate</span>
+                <a href="${documents.certificateUrl}" target="_blank">View Certificate →</a>
+            </div>
+            ` : ''}
+            
+            ${documents.educationDocumentUrls && documents.educationDocumentUrls.length > 0 ? 
+              documents.educationDocumentUrls.map((url, index) => `
+            <div class="document-item">
+                <span class="document-label">📚 Education Document ${index + 1}</span>
+                <a href="${url}" target="_blank">View Education Document ${index + 1} →</a>
+            </div>
+              `).join('') : ''}
+        </div>
+        
+        <div class="verification-request">
+            <h4>⏰ Verification Required</h4>
+            <p>Please verify the following aspects of the submitted documents:</p>
+            <ul>
+                <li>Authenticity and originality of the documents</li>
+                <li>Validation of information against government/institution databases</li>
+                <li>Detection of any tampering or forgery</li>
+                <li>Confirmation of issuing authority</li>
+            </ul>
+            <p><strong>Please provide your verification report at your earliest convenience.</strong></p>
+        </div>
+        
+        <p>If you require any additional information or have questions regarding this verification request, please feel free to contact our HR department.</p>
+        
+        <p>Thank you for your prompt attention to this matter.</p>
+        
+        <p><strong>Best regards,</strong><br>HR Department</p>
+    </div>
+    
+    <div class="footer">
+        <p>This is an automated notification from the employee onboarding system.</p>
+        <p>For questions or concerns, please contact the HR department.</p>
+    </div>
+</body>
+</html>
+    `.trim();
+  }
+
   // TODO: Implement email template system with external files
   // TODO: Add support for email attachments (employee handbook, etc.)
   // TODO: Implement email tracking and delivery confirmation
