@@ -14,6 +14,7 @@ import { bgvRoutes } from './bgv.routes';
 import blobRoutes from './blob.routes';
 import itRoutes from './it.routes';
 import { birthdaysRoutes } from './birthdays.routes';
+import { aiAgentRoutes } from '../features/ai-agent';
 
 const router = Router();
 
@@ -71,6 +72,13 @@ router.use('/it', itRoutes);
  * Mounted at: /api/birthdays/*
  */
 router.use('/birthdays', birthdaysRoutes);
+
+/**
+ * AI Agent Feature Routes
+ * Azure AI Foundry agent integration endpoints
+ * Mounted at: /api/features/ai-agent/*
+ */
+router.use('/features/ai-agent', aiAgentRoutes);
 
 /**
  * TODO: Add additional route modules as they are implemented
