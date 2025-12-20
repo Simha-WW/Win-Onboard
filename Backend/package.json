@@ -40,6 +40,8 @@
     "npm": ">=8.0.0"
   },
   "dependencies": {
+    "@azure/ai-projects": "^1.0.1",
+    "@azure/identity": "^4.13.0",
     "@azure/msal-node": "^3.8.4",
     "@azure/storage-blob": "^12.17.0",
     "@types/pdfkit": "^0.17.4",
