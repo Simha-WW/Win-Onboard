@@ -497,10 +497,7 @@ export const ReviewAndSubmit = () => {
             Declaration
           </h3>
           <p style={{ color: '#4b5563', lineHeight: '1.6', fontSize: '14px' }}>
-            I hereby declare that the information provided above is true and correct to the best of my knowledge. 
-            I understand that any false information or misrepresentation may result in the termination of my employment. 
-            I authorize the organization to verify the information provided and conduct background verification checks as necessary.
-          </p>
+           hereby authorize my current/prospective employer and/or any of its subsidiaries or affiliates or partners or vendors, and any person or organizations acting on its behalf, to verify information presented in my employment application and to compile a background report for that purpose. I hereby grant authority to the bearer of this letter to access or be provided with full details of my previous employment record held by any company or business for which I previously worked. This information should include, but not be restricted to, the dates of employment, position held, details of my salary upon departure and an appraisal of my performance, capabilities and character. I hereby release from liability any person or entity requesting or supplying such information.          </p>
         </div>
 
         {/* Action Buttons */}
