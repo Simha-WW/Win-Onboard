@@ -21,6 +21,24 @@ import {
 import { API_BASE_URL } from '../../config';
 import { documentViewerService } from '../../services/documentViewer.service';
 
+// Add spinner animation styles
+const spinnerStyles = `
+  @keyframes spin {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+  }
+`;
+
+// Inject styles
+if (typeof document !== 'undefined') {
+  const styleElement = document.createElement('style');
+  styleElement.textContent = spinnerStyles;
+  if (!document.head.querySelector('style[data-spinner-styles]')) {
+    styleElement.setAttribute('data-spinner-styles', 'true');
+    document.head.appendChild(styleElement);
+  }
+}
+
 interface FresherInfo {
   id: number;
   first_name: string;
@@ -89,6 +107,7 @@ interface Education {
   year_of_passing: number;
   certificate_name?: string;
   documents?: string;
+  document_url?: string;  // Actual field from educational_details table
 }
 
 interface BGVData {
@@ -121,6 +140,7 @@ export const HrBGVVerification = () => {
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [processing, setProcessing] = useState(false);
+  const [processingDocs, setProcessingDocs] = useState<Set<string>>(new Set());
   const [verifications, setVerifications] = useState<Record<string, DocumentVerification[]>>({});
   const [fresherInfo, setFresherInfo] = useState<FresherInfo | null>(null);
   const [selectedDocument, setSelectedDocument] = useState<DocumentVerification | null>(null);
@@ -162,44 +182,158 @@ export const HrBGVVerification = () => {
       // Build verifications object from demographics, personal, and education data
       const verificationsData: Record<string, DocumentVerification[]> = {};
       
+      // Get existing verification statuses from backend
+      const existingVerifications = result.data.verifications || [];
+      const verificationMap = new Map();
+      existingVerifications.forEach((v: any) => {
+        const key = `${v.document_section}-${v.document_type}`;
+        verificationMap.set(key, {
+          status: v.status,
+          comments: v.comments,
+          verified_at: v.verified_at,
+          hr_first_name: v.hr_first_name,
+          hr_last_name: v.hr_last_name
+        });
+      });
+      
       // Demographics section
       if (result.data.demographics) {
-        verificationsData['Demographics'] = Object.entries(result.data.demographics)
-          .filter(([key]) => !['id', 'fresher_id'].includes(key))
+        const demo = result.data.demographics;
+        
+        // Concatenate communication address
+        const commAddress = [
+          demo.comm_house_number,
+          demo.comm_street_name,
+          demo.comm_city,
+          demo.comm_district,
+          demo.comm_state,
+          demo.comm_country,
+          demo.comm_pin_code
+        ].filter(Boolean).join(', ');
+        
+        // Concatenate permanent address
+        const permAddress = [
+          demo.perm_house_number,
+          demo.perm_street_name,
+          demo.perm_city,
+          demo.perm_district,
+          demo.perm_state,
+          demo.perm_country,
+          demo.perm_pin_code
+        ].filter(Boolean).join(', ');
+        
+        verificationsData['Demographics'] = Object.entries(demo)
+          .filter(([key]) => !['id', 'fresher_id', 'created_at', 'updated_at'].includes(key))
           .filter(([key]) => !key.toLowerCase().includes('file_data'))
-          .map(([key, value]) => ({
-            document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            document_section: 'Demographics',
-            document_value: value,
-            status: 'pending' as const
-          }));
+          .filter(([key]) => !key.toLowerCase().includes('file_name'))
+          .filter(([key]) => !key.toLowerCase().includes('file_type'))
+          .filter(([key]) => !key.toLowerCase().includes('file_size'))
+          .filter(([key]) => !key.toLowerCase().includes('certificate_name'))
+          .filter(([key]) => !key.startsWith('comm_') || key === 'comm_house_number')
+          .filter(([key]) => !key.startsWith('perm_') || key === 'perm_house_number')
+          .map(([key, value]) => {
+            // Replace first occurrence of comm_ address field with concatenated address
+            if (key === 'comm_house_number') {
+              const docType = 'Communication Address';
+              const verificationKey = `Demographics-${docType}`;
+              const savedStatus = verificationMap.get(verificationKey);
+              
+              return {
+                document_type: docType,
+                document_section: 'Demographics',
+                document_value: commAddress || 'Not provided',
+                status: (savedStatus?.status || 'pending') as 'pending' | 'verified' | 'rejected',
+                comments: savedStatus?.comments,
+                verified_at: savedStatus?.verified_at,
+                hr_first_name: savedStatus?.hr_first_name,
+                hr_last_name: savedStatus?.hr_last_name
+              };
+            }
+            // Replace first occurrence of perm_ address field with concatenated address
+            if (key === 'perm_house_number') {
+              const docType = 'Permanent Address';
+              const verificationKey = `Demographics-${docType}`;
+              const savedStatus = verificationMap.get(verificationKey);
+              
+              return {
+                document_type: docType,
+                document_section: 'Demographics',
+                document_value: permAddress || 'Not provided',
+                status: (savedStatus?.status || 'pending') as 'pending' | 'verified' | 'rejected',
+                comments: savedStatus?.comments,
+                verified_at: savedStatus?.verified_at,
+                hr_first_name: savedStatus?.hr_first_name,
+                hr_last_name: savedStatus?.hr_last_name
+              };
+            }
+            
+            const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const verificationKey = `Demographics-${docType}`;
+            const savedStatus = verificationMap.get(verificationKey);
+            
+            return {
+              document_type: docType,
+              document_section: 'Demographics',
+              document_value: value,
+              status: (savedStatus?.status || 'pending') as 'pending' | 'verified' | 'rejected',
+              comments: savedStatus?.comments,
+              verified_at: savedStatus?.verified_at,
+              hr_first_name: savedStatus?.hr_first_name,
+              hr_last_name: savedStatus?.hr_last_name
+            };
+          });
       }
       
       // Personal section
       if (result.data.personal) {
         verificationsData['Personal'] = Object.entries(result.data.personal)
-          .filter(([key]) => !['id', 'fresher_id'].includes(key))
+          .filter(([key]) => !['id', 'fresher_id', 'created_at', 'updated_at'].includes(key))
           .filter(([key]) => !key.toLowerCase().includes('file_data'))
-          .map(([key, value]) => ({
-            document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            document_section: 'Personal',
-            document_value: value,
-            status: 'pending' as const
-          }));
+          .filter(([key]) => !key.toLowerCase().includes('file_name'))
+          .filter(([key]) => !key.toLowerCase().includes('file_type'))
+          .filter(([key]) => !key.toLowerCase().includes('file_size'))
+          .filter(([key]) => !key.toLowerCase().includes('certificate_name'))
+          .map(([key, value]) => {
+            const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const verificationKey = `Personal-${docType}`;
+            const savedStatus = verificationMap.get(verificationKey);
+            
+            return {
+              document_type: docType,
+              document_section: 'Personal',
+              document_value: value,
+              status: (savedStatus?.status || 'pending') as 'pending' | 'verified' | 'rejected',
+              comments: savedStatus?.comments,
+              verified_at: savedStatus?.verified_at,
+              hr_first_name: savedStatus?.hr_first_name,
+              hr_last_name: savedStatus?.hr_last_name
+            };
+          });
       }
       
-      // Education section
+      // Education section - only include the 5 main verifiable fields
       if (result.data.education && result.data.education.length > 0) {
+        const educationFields = ['qualification_type', 'qualification', 'university_institution', 'cgpa_percentage', 'year_of_passing'];
+        
         verificationsData['Education'] = result.data.education.flatMap((edu: Education) => 
           Object.entries(edu)
-            .filter(([key]) => !['id', 'fresher_id'].includes(key))
-            .filter(([key]) => !key.toLowerCase().includes('file_data'))
-            .map(([key, value]) => ({
-              document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-              document_section: 'Education',
-              document_value: value,
-              status: 'pending' as const
-            }))
+            .filter(([key]) => educationFields.includes(key))
+            .map(([key, value]) => {
+              const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              const verificationKey = `Education-${docType}`;
+              const savedStatus = verificationMap.get(verificationKey);
+              
+              return {
+                document_type: docType,
+                document_section: 'Education',
+                document_value: value,
+                status: (savedStatus?.status || 'pending') as 'pending' | 'verified' | 'rejected',
+                comments: savedStatus?.comments,
+                verified_at: savedStatus?.verified_at,
+                hr_first_name: savedStatus?.hr_first_name,
+                hr_last_name: savedStatus?.hr_last_name
+              };
+            })
         );
       }
       
@@ -239,44 +373,158 @@ export const HrBGVVerification = () => {
       // Build verifications object from demographics, personal, and education data
       const verificationsData: Record<string, DocumentVerification[]> = {};
       
+      // Get existing verification statuses from backend
+      const existingVerifications = result.data.verifications || [];
+      const verificationMap = new Map();
+      existingVerifications.forEach((v: any) => {
+        const key = `${v.document_section}-${v.document_type}`;
+        verificationMap.set(key, {
+          status: v.status,
+          comments: v.comments,
+          verified_at: v.verified_at,
+          hr_first_name: v.hr_first_name,
+          hr_last_name: v.hr_last_name
+        });
+      });
+      
       // Demographics section
       if (result.data.demographics) {
-        verificationsData['Demographics'] = Object.entries(result.data.demographics)
-          .filter(([key]) => !['id', 'fresher_id'].includes(key))
+        const demo = result.data.demographics;
+        
+        // Concatenate communication address
+        const commAddress = [
+          demo.comm_house_number,
+          demo.comm_street_name,
+          demo.comm_city,
+          demo.comm_district,
+          demo.comm_state,
+          demo.comm_country,
+          demo.comm_pin_code
+        ].filter(Boolean).join(', ');
+        
+        // Concatenate permanent address
+        const permAddress = [
+          demo.perm_house_number,
+          demo.perm_street_name,
+          demo.perm_city,
+          demo.perm_district,
+          demo.perm_state,
+          demo.perm_country,
+          demo.perm_pin_code
+        ].filter(Boolean).join(', ');
+        
+        verificationsData['Demographics'] = Object.entries(demo)
+          .filter(([key]) => !['id', 'fresher_id', 'created_at', 'updated_at'].includes(key))
           .filter(([key]) => !key.toLowerCase().includes('file_data'))
-          .map(([key, value]) => ({
-            document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            document_section: 'Demographics',
-            document_value: value,
-            status: 'pending'
-          }));
+          .filter(([key]) => !key.toLowerCase().includes('file_name'))
+          .filter(([key]) => !key.toLowerCase().includes('file_type'))
+          .filter(([key]) => !key.toLowerCase().includes('file_size'))
+          .filter(([key]) => !key.toLowerCase().includes('certificate_name'))
+          .filter(([key]) => !key.startsWith('comm_') || key === 'comm_house_number')
+          .filter(([key]) => !key.startsWith('perm_') || key === 'perm_house_number')
+          .map(([key, value]) => {
+            // Replace first occurrence of comm_ address field with concatenated address
+            if (key === 'comm_house_number') {
+              const docType = 'Communication Address';
+              const verificationKey = `Demographics-${docType}`;
+              const savedStatus = verificationMap.get(verificationKey);
+              
+              return {
+                document_type: docType,
+                document_section: 'Demographics',
+                document_value: commAddress || 'Not provided',
+                status: savedStatus?.status || 'pending',
+                comments: savedStatus?.comments,
+                verified_at: savedStatus?.verified_at,
+                hr_first_name: savedStatus?.hr_first_name,
+                hr_last_name: savedStatus?.hr_last_name
+              };
+            }
+            // Replace first occurrence of perm_ address field with concatenated address
+            if (key === 'perm_house_number') {
+              const docType = 'Permanent Address';
+              const verificationKey = `Demographics-${docType}`;
+              const savedStatus = verificationMap.get(verificationKey);
+              
+              return {
+                document_type: docType,
+                document_section: 'Demographics',
+                document_value: permAddress || 'Not provided',
+                status: savedStatus?.status || 'pending',
+                comments: savedStatus?.comments,
+                verified_at: savedStatus?.verified_at,
+                hr_first_name: savedStatus?.hr_first_name,
+                hr_last_name: savedStatus?.hr_last_name
+              };
+            }
+            
+            const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const verificationKey = `Demographics-${docType}`;
+            const savedStatus = verificationMap.get(verificationKey);
+            
+            return {
+              document_type: docType,
+              document_section: 'Demographics',
+              document_value: value,
+              status: savedStatus?.status || 'pending',
+              comments: savedStatus?.comments,
+              verified_at: savedStatus?.verified_at,
+              hr_first_name: savedStatus?.hr_first_name,
+              hr_last_name: savedStatus?.hr_last_name
+            };
+          });
       }
       
       // Personal section
       if (result.data.personal) {
         verificationsData['Personal'] = Object.entries(result.data.personal)
-          .filter(([key]) => !['id', 'fresher_id'].includes(key))
+          .filter(([key]) => !['id', 'fresher_id', 'created_at', 'updated_at'].includes(key))
           .filter(([key]) => !key.toLowerCase().includes('file_data'))
-          .map(([key, value]) => ({
-            document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-            document_section: 'Personal',
-            document_value: value,
-            status: 'pending'
-          }));
+          .filter(([key]) => !key.toLowerCase().includes('file_name'))
+          .filter(([key]) => !key.toLowerCase().includes('file_type'))
+          .filter(([key]) => !key.toLowerCase().includes('file_size'))
+          .filter(([key]) => !key.toLowerCase().includes('certificate_name'))
+          .map(([key, value]) => {
+            const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const verificationKey = `Personal-${docType}`;
+            const savedStatus = verificationMap.get(verificationKey);
+            
+            return {
+              document_type: docType,
+              document_section: 'Personal',
+              document_value: value,
+              status: savedStatus?.status || 'pending',
+              comments: savedStatus?.comments,
+              verified_at: savedStatus?.verified_at,
+              hr_first_name: savedStatus?.hr_first_name,
+              hr_last_name: savedStatus?.hr_last_name
+            };
+          });
       }
       
-      // Education section
+      // Education section - only include the 5 main verifiable fields
       if (result.data.education && result.data.education.length > 0) {
+        const educationFields = ['qualification_type', 'qualification', 'university_institution', 'cgpa_percentage', 'year_of_passing'];
+        
         verificationsData['Education'] = result.data.education.flatMap((edu: Education) => 
           Object.entries(edu)
-            .filter(([key]) => !['id', 'fresher_id'].includes(key))
-            .filter(([key]) => !key.toLowerCase().includes('file_data'))
-            .map(([key, value]) => ({
-              document_type: key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()),
-              document_section: 'Education',
-              document_value: value,
-              status: 'pending'
-            }))
+            .filter(([key]) => educationFields.includes(key))
+            .map(([key, value]) => {
+              const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              const verificationKey = `Education-${docType}`;
+              const savedStatus = verificationMap.get(verificationKey);
+              
+              return {
+                document_type: docType,
+                document_section: 'Education',
+                document_value: value,
+                status: savedStatus?.status || 'pending',
+                comments: savedStatus?.comments,
+                verified_at: savedStatus?.verified_at,
+                hr_first_name: savedStatus?.hr_first_name,
+                hr_last_name: savedStatus?.hr_last_name
+              };
+            })
         );
       }
       
@@ -287,8 +535,12 @@ export const HrBGVVerification = () => {
   };
 
   const handleVerify = async (doc: DocumentVerification) => {
+    const docKey = `${doc.document_section}-${doc.document_type}`;
+    
     try {
-      setProcessing(true);
+      // Add to processing set
+      setProcessingDocs(prev => new Set(prev).add(docKey));
+      
       const token = localStorage.getItem('auth_token');
       
       const response = await fetch(`${API_BASE_URL}/bgv/hr/verify`, {
@@ -306,15 +558,36 @@ export const HrBGVVerification = () => {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to verify document');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to verify document');
+      }
 
-      // Refresh data
+      // Update the verification status immediately in UI
+      setVerifications(prev => {
+        const updated = { ...prev };
+        if (updated[doc.document_section]) {
+          updated[doc.document_section] = updated[doc.document_section].map(d => 
+            d.document_type === doc.document_type && d.document_section === doc.document_section
+              ? { ...d, status: 'verified' }
+              : d
+          );
+        }
+        return updated;
+      });
+
+      // Refresh data to get any server-side updates
       await fetchVerificationData();
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error verifying document:', error);
-      alert('Failed to verify document');
+      alert(error.message || 'Failed to verify document');
     } finally {
-      setProcessing(false);
+      // Remove from processing set
+      setProcessingDocs(prev => {
+        const updated = new Set(prev);
+        updated.delete(docKey);
+        return updated;
+      });
     }
   };
 
@@ -330,8 +603,12 @@ export const HrBGVVerification = () => {
       return;
     }
 
+    const docKey = `${selectedDocument.document_section}-${selectedDocument.document_type}`;
+
     try {
       setProcessing(true);
+      setProcessingDocs(prev => new Set(prev).add(docKey));
+      
       const token = localStorage.getItem('auth_token');
       
       const response = await fetch(`${API_BASE_URL}/bgv/hr/verify`, {
@@ -349,18 +626,39 @@ export const HrBGVVerification = () => {
         })
       });
 
-      if (!response.ok) throw new Error('Failed to reject document');
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to reject document');
+      }
+
+      // Update the verification status immediately in UI
+      setVerifications(prev => {
+        const updated = { ...prev };
+        if (updated[selectedDocument.document_section]) {
+          updated[selectedDocument.document_section] = updated[selectedDocument.document_section].map(d => 
+            d.document_type === selectedDocument.document_type && d.document_section === selectedDocument.document_section
+              ? { ...d, status: 'rejected', comments: rejectComments }
+              : d
+          );
+        }
+        return updated;
+      });
 
       // Refresh data and close modal
       await fetchVerificationData();
       setRejectModalOpen(false);
       setSelectedDocument(null);
       setRejectComments('');
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error rejecting document:', error);
-      alert('Failed to reject document');
+      alert(error.message || 'Failed to reject document');
     } finally {
       setProcessing(false);
+      setProcessingDocs(prev => {
+        const updated = new Set(prev);
+        updated.delete(docKey);
+        return updated;
+      });
     }
   };
 
@@ -403,6 +701,29 @@ export const HrBGVVerification = () => {
     } finally {
       setProcessing(false);
     }
+  };
+
+  const getSectionVerificationStatus = (sectionName: string) => {
+    const sectionDocs = verifications[sectionName] || [];
+    if (sectionDocs.length === 0) return { verified: 0, total: 0, allVerified: false };
+    
+    const verifiedCount = sectionDocs.filter(d => d.status === 'verified').length;
+    const total = sectionDocs.length;
+    
+    return {
+      verified: verifiedCount,
+      total: total,
+      allVerified: verifiedCount === total && total > 0
+    };
+  };
+
+  const getTotalSectionsVerified = () => {
+    const sections = ['Demographics', 'Personal', 'Education'];
+    const verifiedSections = sections.filter(section => {
+      const status = getSectionVerificationStatus(section);
+      return status.allVerified;
+    }).length;
+    return { verified: verifiedSections, total: sections.length };
   };
 
   const getStatusBadge = (status: string) => {
@@ -598,6 +919,7 @@ export const HrBGVVerification = () => {
   const verifiedCount = allDocs.filter(d => d.status === 'verified').length;
   const rejectedCount = allDocs.filter(d => d.status === 'rejected').length;
   const pendingCount = allDocs.filter(d => !d.status || d.status === 'pending').length;
+  const sectionsProgress = getTotalSectionsVerified();
 
   return (
     <div style={{
@@ -637,36 +959,48 @@ export const HrBGVVerification = () => {
             fontSize: '24px',
             fontWeight: '700',
             color: '#1f2937',
-            margin: '0 0 16px 0'
+            margin: '0 0 20px 0'
           }}>
-            {fresherInfo.first_name} {fresherInfo.last_name}
+            {fresherInfo.first_name || fresherInfo.last_name 
+              ? `${fresherInfo.first_name || ''}${fresherInfo.first_name && fresherInfo.last_name ? ' ' : ''}${fresherInfo.last_name || ''}`.trim()
+              : 'N/A'}
           </h1>
 
           <div style={{
             display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-            gap: '16px',
-            marginBottom: '16px'
+            gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+            gap: '20px',
+            marginBottom: '20px'
           }}>
             <div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Designation</div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', fontWeight: '500' }}>Designation</div>
               <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>{fresherInfo.designation}</div>
             </div>
             <div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Email</div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151' }}>{fresherInfo.email}</div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', fontWeight: '500' }}>Email</div>
+              <div style={{ fontSize: '14px', fontWeight: '600', color: '#374151', wordBreak: 'break-word' }}>{fresherInfo.email}</div>
             </div>
             <div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Verified</div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#10b981' }}>{verifiedCount}</div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', fontWeight: '500' }}>Sections Completed</div>
+              <div style={{ 
+                fontSize: '18px', 
+                fontWeight: '700', 
+                color: sectionsProgress.verified === sectionsProgress.total ? '#10b981' : '#3b82f6' 
+              }}>
+                {sectionsProgress.verified} of {sectionsProgress.total}
+              </div>
             </div>
             <div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Rejected</div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#ef4444' }}>{rejectedCount}</div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', fontWeight: '500' }}>Fields Verified</div>
+              <div style={{ fontSize: '18px', fontWeight: '700', color: '#10b981' }}>{verifiedCount}</div>
             </div>
             <div>
-              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px' }}>Pending</div>
-              <div style={{ fontSize: '14px', fontWeight: '600', color: '#eab308' }}>{pendingCount}</div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', fontWeight: '500' }}>Rejected</div>
+              <div style={{ fontSize: '18px', fontWeight: '700', color: '#ef4444' }}>{rejectedCount}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '4px', fontWeight: '500' }}>Pending</div>
+              <div style={{ fontSize: '18px', fontWeight: '700', color: '#eab308' }}>{pendingCount}</div>
             </div>
           </div>
 
@@ -699,9 +1033,9 @@ export const HrBGVVerification = () => {
 
       {/* Documents by Section */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: '24px' }}>
-        {Object.entries(verifications).map(([section, docs]) => (
+        {/* Demographics Section */}
+        {verifications['Demographics'] && (
           <div
-            key={section}
             style={{
               backgroundColor: 'white',
               borderRadius: '12px',
@@ -712,7 +1046,10 @@ export const HrBGVVerification = () => {
             <div style={{
               padding: '16px 20px',
               backgroundColor: '#f9fafb',
-              borderBottom: '1px solid #e5e7eb'
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
             }}>
               <h2 style={{
                 fontSize: '18px',
@@ -720,183 +1057,783 @@ export const HrBGVVerification = () => {
                 color: '#1f2937',
                 margin: 0
               }}>
-                {section}
+                Demographics
               </h2>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: getSectionVerificationStatus('Demographics').allVerified ? '#10b981' : '#6b7280'
+              }}>
+                {getSectionVerificationStatus('Demographics').verified} / {getSectionVerificationStatus('Demographics').total} verified
+              </div>
             </div>
 
-            <div style={{ padding: '20px' }}>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                {docs.map((doc, idx) => {
-                  const status = getStatusBadge(doc.status || 'pending');
-                  
-                  return (
-                    <div
-                      key={idx}
-                      style={{
-                        padding: '16px',
-                        border: '1px solid #e5e7eb',
-                        borderRadius: '8px',
-                        backgroundColor: '#f9fafb'
-                      }}
-                    >
-                      <div style={{
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'flex-start',
-                        marginBottom: '12px'
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '14px'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f9fafb' }}>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '30%'
+                    }}>Property</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '50%'
+                    }}>Value</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '20%'
+                    }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {verifications['Demographics'].map((doc, idx) => {
+                    const status = getStatusBadge(doc.status || 'pending');
+                    const docKey = `${doc.document_section}-${doc.document_type}`;
+                    const isProcessing = processingDocs.has(docKey);
+                    
+                    return (
+                      <tr key={idx} style={{
+                        borderBottom: '1px solid #e5e7eb',
+                        backgroundColor: idx % 2 === 0 ? 'white' : '#f9fafb'
                       }}>
-                        <div style={{ flex: 1 }}>
-                          <h3 style={{
-                            fontSize: '16px',
-                            fontWeight: '600',
-                            color: '#1f2937',
-                            margin: '0 0 8px 0'
-                          }}>
-                            {doc.document_type}
-                          </h3>
+                        <td style={{
+                          padding: '12px 16px',
+                          fontWeight: '500',
+                          color: '#1f2937'
+                        }}>
+                          {doc.document_type}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          color: '#6b7280',
+                          wordBreak: 'break-word'
+                        }}>
+                          {isDocumentField(doc.document_type, doc.document_value) ? (
+                            <button
+                              onClick={() => handleViewDocument(doc.document_value, doc.document_type)}
+                              style={{
+                                padding: '4px 12px',
+                                backgroundColor: '#3b82f6',
+                                color: 'white',
+                                border: 'none',
+                                borderRadius: '4px',
+                                fontSize: '12px',
+                                fontWeight: '500',
+                                cursor: 'pointer',
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px'
+                              }}
+                            >
+                              <FiEye size={12} />
+                              View
+                            </button>
+                          ) : documentViewerService.isBlobUrl(doc.document_value) ? (
+                            <a
+                              href={doc.document_value}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              style={{
+                                color: '#3b82f6',
+                                textDecoration: 'underline',
+                                wordBreak: 'break-all'
+                              }}
+                            >
+                              View Link
+                            </a>
+                          ) : (
+                            <>
+                              {formatValue(doc.document_value, doc.document_type)}
+                              {doc.comments && (
+                                <div style={{
+                                  marginTop: '8px',
+                                  padding: '8px',
+                                  backgroundColor: '#fef2f2',
+                                  borderRadius: '4px',
+                                  borderLeft: '3px solid #ef4444',
+                                  fontSize: '12px'
+                                }}>
+                                  <strong style={{ color: '#991b1b' }}>Rejection: </strong>
+                                  <span style={{ color: '#7f1d1d' }}>{doc.comments}</span>
+                                </div>
+                              )}
+                            </>
+                          )}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          textAlign: 'center'
+                        }}>
                           <div style={{
-                            fontSize: '14px',
-                            color: '#6b7280',
-                            wordBreak: 'break-word'
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
                           }}>
-                            {isDocumentField(doc.document_type, doc.document_value) ? (
+                            {isProcessing ? (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                color: '#6b7280',
+                                fontSize: '11px'
+                              }}>
+                                <div style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  border: '2px solid #e5e7eb',
+                                  borderTop: '2px solid #3b82f6',
+                                  borderRadius: '50%',
+                                  animation: 'spin 0.6s linear infinite'
+                                }} />
+                                Processing...
+                              </div>
+                            ) : doc.status === 'verified' ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: status.bgColor,
+                                color: status.color,
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '600'
+                              }}>
+                                {status.icon}
+                                {status.label}
+                              </span>
+                            ) : doc.status === 'rejected' ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: status.bgColor,
+                                color: status.color,
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '600'
+                              }}>
+                                {status.icon}
+                                {status.label}
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleVerify(doc)}
+                                  disabled={isProcessing}
+                                  title="Verify"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#10b981',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiCheckCircle size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleReject(doc)}
+                                  disabled={isProcessing}
+                                  title="Reject"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiX size={16} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Personal Details Section */}
+        {verifications['Personal'] && (
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              border: '1px solid #e5e7eb',
+              overflow: 'hidden'
+            }}
+          >
+            <div style={{
+              padding: '16px 20px',
+              backgroundColor: '#f9fafb',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h2 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                Personal Details
+              </h2>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: getSectionVerificationStatus('Personal').allVerified ? '#10b981' : '#6b7280'
+              }}>
+                {getSectionVerificationStatus('Personal').verified} / {getSectionVerificationStatus('Personal').total} verified
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '14px'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f9fafb' }}>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '30%'
+                    }}>Property</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '50%'
+                    }}>Value</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '20%'
+                    }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {verifications['Personal'].map((doc, idx) => {
+                    const status = getStatusBadge(doc.status || 'pending');
+                    const docKey = `${doc.document_section}-${doc.document_type}`;
+                    const isProcessing = processingDocs.has(docKey);
+                    
+                    return (
+                      <tr key={idx} style={{
+                        borderBottom: '1px solid #e5e7eb',
+                        backgroundColor: idx % 2 === 0 ? 'white' : '#f9fafb'
+                      }}>
+                        <td style={{
+                          padding: '12px 16px',
+                          fontWeight: '500',
+                          color: '#1f2937'
+                        }}>
+                          {doc.document_type}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          color: '#6b7280',
+                          wordBreak: 'break-word'
+                        }}>
+                          {formatValue(doc.document_value, doc.document_type)}
+                          {doc.comments && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              backgroundColor: '#fef2f2',
+                              borderRadius: '4px',
+                              borderLeft: '3px solid #ef4444',
+                              fontSize: '12px'
+                            }}>
+                              <strong style={{ color: '#991b1b' }}>Rejection: </strong>
+                              <span style={{ color: '#7f1d1d' }}>{doc.comments}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}>
+                            {isProcessing ? (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                color: '#6b7280',
+                                fontSize: '11px'
+                              }}>
+                                <div style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  border: '2px solid #e5e7eb',
+                                  borderTop: '2px solid #3b82f6',
+                                  borderRadius: '50%',
+                                  animation: 'spin 0.6s linear infinite'
+                                }} />
+                                Processing...
+                              </div>
+                            ) : doc.status === 'verified' ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: status.bgColor,
+                                color: status.color,
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '600'
+                              }}>
+                                {status.icon}
+                                {status.label}
+                              </span>
+                            ) : doc.status === 'rejected' ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: status.bgColor,
+                                color: status.color,
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '600'
+                              }}>
+                                {status.icon}
+                                {status.label}
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleVerify(doc)}
+                                  disabled={isProcessing}
+                                  title="Verify"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#10b981',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiCheckCircle size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleReject(doc)}
+                                  disabled={isProcessing}
+                                  title="Reject"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiX size={16} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Education Section */}
+        {verifications['Education'] && (
+          <div
+            style={{
+              backgroundColor: 'white',
+              borderRadius: '12px',
+              border: '1px solid #e5e7eb',
+              overflow: 'hidden'
+            }}
+          >
+            <div style={{
+              padding: '16px 20px',
+              backgroundColor: '#f9fafb',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h2 style={{
+                fontSize: '18px',
+                fontWeight: '600',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                Education
+              </h2>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: getSectionVerificationStatus('Education').allVerified ? '#10b981' : '#6b7280'
+              }}>
+                {getSectionVerificationStatus('Education').verified} / {getSectionVerificationStatus('Education').total} verified
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '14px'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f9fafb' }}>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb'
+                    }}>Qualification Type</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb'
+                    }}>Qualification</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb'
+                    }}>University/Institution</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb'
+                    }}>CGPA/Percentage</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb'
+                    }}>Year of Passing</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb'
+                    }}>Document</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '120px'
+                    }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {bgvData?.education && bgvData.education.map((edu, idx) => {
+                    // Get status for each field
+                    const qualTypeDoc = verifications['Education']?.find(d => 
+                      d.document_value === edu.qualification_type && d.document_type.includes('Qualification Type')
+                    );
+                    const qualDoc = verifications['Education']?.find(d => 
+                      d.document_value === edu.qualification && d.document_type === 'Qualification'
+                    );
+                    const uniDoc = verifications['Education']?.find(d => 
+                      d.document_value === edu.university_institution && d.document_type.includes('University')
+                    );
+                    const cgpaDoc = verifications['Education']?.find(d => 
+                      d.document_value === edu.cgpa_percentage && d.document_type.includes('Cgpa')
+                    );
+                    const yearDoc = verifications['Education']?.find(d => 
+                      d.document_value === edu.year_of_passing && d.document_type.includes('Year')
+                    );
+                    const docUrlDoc = verifications['Education']?.find(d => 
+                      d.document_type === 'Documents'
+                    );
+
+                    // Create a combined document for row-level verification
+                    const rowDoc: DocumentVerification = {
+                      document_type: `Education Record ${idx + 1}`,
+                      document_section: 'Education',
+                      document_value: edu,
+                      status: 'pending'
+                    };
+
+                    const status = getStatusBadge(rowDoc.status || 'pending');
+                    const docKey = `${rowDoc.document_section}-${rowDoc.document_type}`;
+                    const isProcessing = processingDocs.has(docKey);
+
+                    return (
+                      <tr key={idx} style={{
+                        borderBottom: '1px solid #e5e7eb',
+                        backgroundColor: idx % 2 === 0 ? 'white' : '#f9fafb'
+                      }}>
+                        <td style={{
+                          padding: '12px 16px',
+                          color: '#6b7280'
+                        }}>
+                          {edu.qualification_type || 'N/A'}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          color: '#6b7280'
+                        }}>
+                          {edu.qualification || 'N/A'}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          color: '#6b7280'
+                        }}>
+                          {edu.university_institution || 'N/A'}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          color: '#6b7280'
+                        }}>
+                          {edu.cgpa_percentage || 'N/A'}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          color: '#6b7280'
+                        }}>
+                          {edu.year_of_passing || 'N/A'}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          textAlign: 'center'
+                        }}>
+                          {(() => {
+                            // Check for document_url (from database) or documents field
+                            const docUrl = edu.document_url || edu.documents;
+                            const hasDocument = docUrl && docUrl !== 'null' && docUrl.toString().trim() !== '';
+                            
+                            return hasDocument ? (
                               <button
-                                onClick={() => handleViewDocument(doc.document_value, doc.document_type)}
+                                onClick={async () => {
+                                  try {
+                                    let documentUrl = docUrl;
+                                    
+                                    // Parse if it's a JSON string containing document array
+                                    if (typeof documentUrl === 'string' && documentUrl.trim().startsWith('[')) {
+                                      const docs = JSON.parse(documentUrl);
+                                      if (docs.length > 0 && docs[0].fileUrl) {
+                                        documentUrl = docs[0].fileUrl;
+                                      }
+                                    }
+                                    
+                                    // If it's already a blob URL or http URL, open directly
+                                    if (documentUrl && (documentViewerService.isBlobUrl(documentUrl) || documentUrl.startsWith('http'))) {
+                                      window.open(documentUrl, '_blank');
+                                    } else if (documentUrl) {
+                                      // Otherwise use the view document handler
+                                      handleViewDocument(documentUrl, 'Education Document');
+                                    }
+                                  } catch (error) {
+                                    console.error('Error viewing document:', error);
+                                    alert('Failed to view document');
+                                  }
+                                }}
                                 style={{
-                                  padding: '8px 16px',
+                                  padding: '4px 12px',
                                   backgroundColor: '#3b82f6',
                                   color: 'white',
                                   border: 'none',
-                                  borderRadius: '6px',
-                                  fontSize: '13px',
+                                  borderRadius: '4px',
+                                  fontSize: '12px',
                                   fontWeight: '500',
                                   cursor: 'pointer',
-                                  display: 'flex',
+                                  display: 'inline-flex',
                                   alignItems: 'center',
-                                  gap: '6px'
+                                  gap: '4px'
                                 }}
                               >
-                                <FiEye />
-                                View Document
+                                <FiEye size={12} />
+                                View
                               </button>
-                            ) : documentViewerService.isBlobUrl(doc.document_value) ? (
-                              <a
-                                href={doc.document_value}
-                                target="_blank"
-                                rel="noopener noreferrer"
-                                style={{
-                                  color: '#3b82f6',
-                                  textDecoration: 'underline',
-                                  wordBreak: 'break-all'
-                                }}
-                              >
-                                {doc.document_value}
-                              </a>
                             ) : (
-                              formatValue(doc.document_value, doc.document_type)
+                              <span style={{ color: '#9ca3af', fontSize: '12px' }}>No document</span>
+                            );
+                          })()}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}>
+                            {isProcessing ? (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                color: '#6b7280',
+                                fontSize: '11px'
+                              }}>
+                                <div style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  border: '2px solid #e5e7eb',
+                                  borderTop: '2px solid #3b82f6',
+                                  borderRadius: '50%',
+                                  animation: 'spin 0.6s linear infinite'
+                                }} />
+                                Processing...
+                              </div>
+                            ) : rowDoc.status === 'verified' ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: status.bgColor,
+                                color: status.color,
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '600'
+                              }}>
+                                {status.icon}
+                                {status.label}
+                              </span>
+                            ) : rowDoc.status === 'rejected' ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: status.bgColor,
+                                color: status.color,
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '600'
+                              }}>
+                                {status.icon}
+                                {status.label}
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleVerify(rowDoc)}
+                                  disabled={isProcessing}
+                                  title="Verify"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#10b981',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiCheckCircle size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleReject(rowDoc)}
+                                  disabled={isProcessing}
+                                  title="Reject"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiX size={16} />
+                                </button>
+                              </>
                             )}
                           </div>
-                        </div>
-
-                        <div style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          gap: '6px',
-                          backgroundColor: status.bgColor,
-                          color: status.color,
-                          padding: '6px 12px',
-                          borderRadius: '20px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          marginLeft: '16px'
-                        }}>
-                          {status.icon}
-                          {status.label}
-                        </div>
-                      </div>
-
-                      {doc.comments && (
-                        <div style={{
-                          marginBottom: '12px',
-                          padding: '12px',
-                          backgroundColor: '#fef2f2',
-                          borderRadius: '6px',
-                          borderLeft: '4px solid #ef4444'
-                        }}>
-                          <div style={{ fontSize: '12px', fontWeight: '600', color: '#991b1b', marginBottom: '4px' }}>
-                            Rejection Comments:
-                          </div>
-                          <div style={{ fontSize: '13px', color: '#7f1d1d' }}>
-                            {doc.comments}
-                          </div>
-                        </div>
-                      )}
-
-                      {doc.hr_first_name && (
-                        <div style={{ fontSize: '12px', color: '#6b7280', marginBottom: '12px' }}>
-                          Reviewed by: {doc.hr_first_name} {doc.hr_last_name} on {new Date(doc.verified_at!).toLocaleDateString()}
-                        </div>
-                      )}
-
-                      {/* Action Buttons */}
-                      <div style={{ display: 'flex', gap: '8px' }}>
-                        {doc.status !== 'verified' && (
-                          <button
-                            onClick={() => handleVerify(doc)}
-                            disabled={processing}
-                            style={{
-                              flex: 1,
-                              padding: '10px',
-                              backgroundColor: '#10b981',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              fontSize: '14px',
-                              fontWeight: '600',
-                              cursor: processing ? 'not-allowed' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <FiCheckCircle />
-                            Verify
-                          </button>
-                        )}
-
-                        {doc.status !== 'rejected' && (
-                          <button
-                            onClick={() => handleReject(doc)}
-                            disabled={processing}
-                            style={{
-                              flex: 1,
-                              padding: '10px',
-                              backgroundColor: '#ef4444',
-                              color: 'white',
-                              border: 'none',
-                              borderRadius: '6px',
-                              fontSize: '14px',
-                              fontWeight: '600',
-                              cursor: processing ? 'not-allowed' : 'pointer',
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'center',
-                              gap: '6px'
-                            }}
-                          >
-                            <FiX />
-                            Reject
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
             </div>
           </div>
-        ))}
+        )}
       </div>
 
       {/* Reject Modal */}

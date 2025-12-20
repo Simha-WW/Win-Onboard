@@ -37,6 +37,8 @@ interface BGVSubmission {
   sent_to_it: number;
   vendor_verified: number;
   vendor_rejected: number;
+  sections_completed?: number;
+  total_sections?: number;
 }
 
 export const HrDocumentsBGV = () => {
@@ -63,7 +65,61 @@ export const HrDocumentsBGV = () => {
       if (!response.ok) throw new Error('Failed to fetch submissions');
 
       const data = await response.json();
-      setSubmissions(data.data || []);
+      
+      // Fetch detailed verification data for each submission to calculate sections completed
+      const submissionsWithSections = await Promise.all(
+        (data.data || []).map(async (submission: BGVSubmission) => {
+          try {
+            const verificationResponse = await fetch(
+              `${API_BASE_URL}/bgv/hr/verification/${submission.fresher_id}`,
+              {
+                headers: {
+                  'Authorization': `Bearer ${token}`
+                }
+              }
+            );
+            
+            if (verificationResponse.ok) {
+              const verificationData = await verificationResponse.json();
+              const verifications = verificationData.data.verifications || [];
+              
+              // Calculate sections completed (Demographics, Personal, Education)
+              const sectionStats: Record<string, { total: number; verified: number }> = {};
+              
+              verifications.forEach((v: any) => {
+                if (!sectionStats[v.document_section]) {
+                  sectionStats[v.document_section] = { total: 0, verified: 0 };
+                }
+                sectionStats[v.document_section].total++;
+                if (v.status === 'verified') {
+                  sectionStats[v.document_section].verified++;
+                }
+              });
+              
+              // Count sections where all documents are verified
+              const sectionsCompleted = Object.values(sectionStats).filter(
+                stat => stat.total > 0 && stat.verified === stat.total
+              ).length;
+              
+              return {
+                ...submission,
+                sections_completed: sectionsCompleted,
+                total_sections: 3 // Demographics, Personal, Education
+              };
+            }
+          } catch (error) {
+            console.error(`Error fetching verification data for fresher ${submission.fresher_id}:`, error);
+          }
+          
+          return {
+            ...submission,
+            sections_completed: 0,
+            total_sections: 3
+          };
+        })
+      );
+      
+      setSubmissions(submissionsWithSections);
     } catch (error) {
       console.error('Error fetching BGV submissions:', error);
     } finally {
@@ -474,36 +530,57 @@ export const HrDocumentsBGV = () => {
                   </div>
                 </div>
 
-                {/* Documents Progress */}
-                <div style={{ marginBottom: '16px' }}>
+                {/* Progress Metrics */}
+                <div style={{ marginBottom: '16px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                  {/* Sections Completed */}
                   <div style={{
                     display: 'flex',
                     justifyContent: 'space-between',
-                    marginBottom: '8px'
+                    alignItems: 'center'
                   }}>
-                    <span style={{ fontSize: '13px', color: '#6b7280' }}>
-                      Documents Verified
+                    <span style={{ fontSize: '13px', color: '#6b7280', fontWeight: '500' }}>
+                      Sections Completed
                     </span>
-                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>
-                      {submission.verified_count} / {submission.total_verifications || 'Pending'}
+                    <span style={{ 
+                      fontSize: '16px', 
+                      fontWeight: '700', 
+                      color: submission.sections_completed === submission.total_sections ? '#10b981' : '#3b82f6' 
+                    }}>
+                      {submission.sections_completed || 0} of {submission.total_sections || 3}
                     </span>
                   </div>
                   
-                  {submission.total_verifications > 0 && (
+                  {/* Fields Verified */}
+                  <div>
                     <div style={{
-                      height: '6px',
-                      backgroundColor: '#e5e7eb',
-                      borderRadius: '3px',
-                      overflow: 'hidden'
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      marginBottom: '8px'
                     }}>
-                      <div style={{
-                        height: '100%',
-                        width: `${(submission.verified_count / submission.total_verifications) * 100}%`,
-                        backgroundColor: submission.rejected_count > 0 ? '#ef4444' : '#10b981',
-                        transition: 'width 0.3s'
-                      }} />
+                      <span style={{ fontSize: '13px', color: '#6b7280' }}>
+                        Fields Verified
+                      </span>
+                      <span style={{ fontSize: '13px', fontWeight: '600', color: '#374151' }}>
+                        {submission.verified_count} / {submission.total_verifications || 'Pending'}
+                      </span>
                     </div>
-                  )}
+                    
+                    {submission.total_verifications > 0 && (
+                      <div style={{
+                        height: '6px',
+                        backgroundColor: '#e5e7eb',
+                        borderRadius: '3px',
+                        overflow: 'hidden'
+                      }}>
+                        <div style={{
+                          height: '100%',
+                          width: `${(submission.verified_count / submission.total_verifications) * 100}%`,
+                          backgroundColor: submission.rejected_count > 0 ? '#ef4444' : '#10b981',
+                          transition: 'width 0.3s'
+                        }} />
+                      </div>
+                    )}
+                  </div>
                 </div>
 
                 {/* Action Buttons */}

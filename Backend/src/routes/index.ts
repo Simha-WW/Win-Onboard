@@ -13,6 +13,7 @@ import { authRoutes } from './auth.routes';
 import { bgvRoutes } from './bgv.routes';
 import blobRoutes from './blob.routes';
 import itRoutes from './it.routes';
+import { birthdaysRoutes } from './birthdays.routes';
 
 const router = Router();
 
@@ -63,6 +64,13 @@ router.use('/blob', blobRoutes);
  * Mounted at: /api/it/*
  */
 router.use('/it', itRoutes);
+
+/**
+ * Birthdays Routes
+ * Employee birthday tracking and export endpoints
+ * Mounted at: /api/birthdays/*
+ */
+router.use('/birthdays', birthdaysRoutes);
 
 /**
  * TODO: Add additional route modules as they are implemented
