@@ -1,185 +1,194 @@
-import { AIProjectsClient } from '@azure/ai-projects';
-import { AzureKeyCredential } from '@azure/core-auth';
+import axios from 'axios';
 
 /**
  * AI Agent Service
- * Handles communication with Azure AI Foundry Agent with custom knowledge base
- * 
- * Uses Azure AI Projects SDK to connect to your configured agent
- * The agent has access to custom knowledge/data sources you configured in Azure AI Foundry
+ * Uses Azure OpenAI Chat Completions API with company knowledge in system prompt
+ * More reliable than Azure AI Foundry and uses existing credentials
  */
 export class AIAgentService {
-  private client: AIProjectsClient | null = null;
-  private agentId: string;
-  private demoMode: boolean = false;
-  private projectEndpoint: string;
+  private endpoint: string;
   private apiKey: string;
+  private deployment: string;
+  private apiVersion: string;
+  private demoMode: boolean = false;
+  
+  // Store conversation history per thread
+  private conversationHistory: Map<string, Array<{ role: string; content: string }>> = new Map();
 
   constructor() {
-    this.projectEndpoint = process.env.AZURE_FOUNDRY_PROJECT_ENDPOINT || '';
-    this.apiKey = process.env.AZURE_FOUNDRY_API_KEY || process.env.AZURE_OPENAI_API_KEY || '';
-    this.agentId = process.env.AZURE_FOUNDRY_AGENT_ID || 'asst_LfrmJixgihcM4gRdBqqEkvY0';
+    this.endpoint = process.env.AZURE_OPENAI_ENDPOINT || '';
+    this.apiKey = process.env.AZURE_OPENAI_API_KEY || '';
+    this.deployment = process.env.AZURE_OPENAI_DEPLOYMENT || 'gpt-4o-mini';
+    this.apiVersion = process.env.AZURE_OPENAI_API_VERSION || '2024-02-15-preview';
 
-    if (!this.projectEndpoint || !this.apiKey) {
-      console.warn('⚠️ Azure AI Foundry not configured - using DEMO MODE');
+    if (!this.endpoint || !this.apiKey) {
+      console.warn('⚠️ Azure OpenAI not configured - using DEMO MODE');
       this.demoMode = true;
-    } else if (this.apiKey.length < 50 || this.apiKey.toLowerCase().includes('dummy') || this.apiKey.toLowerCase().includes('demo') || this.apiKey.toLowerCase().includes('test') || this.apiKey.toLowerCase().includes('placeholder')) {
+    } else if (this.apiKey.length < 50 || this.apiKey.toLowerCase().includes('demo')) {
       console.warn('⚠️ Using DEMO MODE - API key appears to be a placeholder');
       this.demoMode = true;
     } else {
-      try {
-        // Initialize Azure AI Projects client with API key authentication
-        const credential = new AzureKeyCredential(this.apiKey);
-        this.client = new AIProjectsClient(this.projectEndpoint, credential);
-        
-        console.log('✅ Azure AI Foundry Agent configured:', {
-          endpoint: this.projectEndpoint,
-          agentId: this.agentId,
-          hasKnowledgeBase: true
-        });
-      } catch (error: any) {
-        console.error('❌ Failed to initialize Azure AI Projects client:', error.message);
-        this.demoMode = true;
-      }
+      console.log('✅ Azure OpenAI AI Agent configured:', {
+        endpoint: this.endpoint,
+        deployment: this.deployment,
+        apiVersion: this.apiVersion
+      });
     }
   }
 
-  /**
-   * Process user message using Azure AI Foundry Agent with knowledge base
-   */
+  private getHeaders(): Record<string, string> {
+    return {
+      'Content-Type': 'application/json',
+      'api-key': this.apiKey
+    };
+  }
+
+  private getConversationHistory(threadId: string): Array<{ role: string; content: string }> {
+    if (!this.conversationHistory.has(threadId)) {
+      this.conversationHistory.set(threadId, [
+        {
+          role: 'system',
+          content: `You are an AI assistant for WinOnboard, an employee onboarding platform.
+
+COMPANY KNOWLEDGE BASE:
+- WinOnboard is a comprehensive employee onboarding system for new hires
+- The platform handles Background Verification (BGV), document submission, and HR processes
+- New employees (freshers) receive welcome emails with their credentials
+
+ONBOARDING DOCUMENTS REQUIRED:
+1. Personal Information:
+   - Full name, date of birth, gender
+   - Contact details (phone, email, address)
+   - Emergency contact information
+   - PAN card, Aadhaar card
+
+2. Educational Documents:
+   - 10th grade certificate and marksheet
+   - 12th grade/Diploma certificate and marksheet  
+   - Degree certificate and all semester marksheets
+   - Any additional certifications
+
+3. Employment History:
+   - Previous employment details (if applicable)
+   - Experience letters
+   - Relieving letters
+   - Salary slips (last 3 months)
+
+4. Other Documents:
+   - Passport size photographs
+   - Passport (if available)
+   - Bank account details and cancelled cheque
+   - Address proof
+
+BACKGROUND VERIFICATION PROCESS:
+1. Document Submission: Upload all required documents in the portal
+2. Document Verification: HR team reviews submitted documents
+3. Background Check: Education and employment verification
+4. IT Onboarding: Once approved, IT team provides equipment and access
+5. Final Approval: Complete onboarding and joining formalities
+
+PLATFORM FEATURES:
+- Secure document upload to Azure Blob Storage
+- Real-time submission status tracking
+- Email notifications for important updates
+- HR and IT team dashboards
+- Birthday tracking and celebrations
+- Vendor verification integration
+
+Be helpful, professional, and provide accurate information based on this knowledge base. If asked about specific personal data or status, guide them to check their dashboard or contact HR.`
+        }
+      ]);
+    }
+    return this.conversationHistory.get(threadId)!;
+  }
+
   async processMessage(userMessage: string, threadId?: string): Promise<string> {
     try {
-      console.log(`[AI Agent] Processing message: "${userMessage.substring(0, 50)}..."`);
-
-      // Demo mode response
-      if (this.demoMode || !this.client) {
-        const demoResponses = [
-          "Hello! I'm your WinOnboard AI assistant with access to company knowledge. I can help you with onboarding questions, document requirements, and HR policies. How can I assist you today?",
-          "Based on the company documentation, you'll typically need to submit educational certificates, previous employment records, and identity proof for onboarding. Would you like more specific information?",
-          "I can help you with your onboarding journey. I have access to all company policies and procedures. What would you like to know?",
-          "The onboarding process includes document verification, background checks, and completing personal information forms. I can guide you through each step based on our company's specific requirements."
-        ];
-        const response = demoResponses[Math.floor(Math.random() * demoResponses.length)];
-        console.log(`[DEMO] Generated response`);
-        return response;
-      }
-
-      // Create or get thread
       if (!threadId) {
-        console.log('[AI Agent] Creating new thread...');
-        const thread = await this.client.agents.createThread();
-        threadId = thread.id;
-        console.log(`[AI Agent] Created thread: ${threadId}`);
+        threadId = `thread_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       }
 
-      // Add user message to thread
-      console.log(`[AI Agent] Adding message to thread ${threadId}`);
-      await this.client.agents.createMessage(threadId, {
+      console.log(`[AI Agent] Processing message for thread: ${threadId}`);
+
+      // Demo mode
+      if (this.demoMode) {
+        const responses = [
+          "Hello! I'm your WinOnboard AI assistant. I can help you with onboarding questions, document requirements, and HR policies.",
+          "For onboarding, you'll need educational certificates, employment records, ID proof, and bank details.",
+          "The onboarding process includes document submission, verification, background checks, and IT setup.",
+          "I can help you understand what documents are required and guide you through the onboarding process."
+        ];
+        return responses[Math.floor(Math.random() * responses.length)];
+      }
+
+      // Get conversation history
+      const messages = this.getConversationHistory(threadId);
+      
+      // Add user message
+      messages.push({
         role: 'user',
         content: userMessage
       });
 
-      // Run the agent (this will use your agent's knowledge base)
-      console.log(`[AI Agent] Running agent ${this.agentId} on thread ${threadId}`);
-      const run = await this.client.agents.createRun(threadId, {
-        assistantId: this.agentId
+      // Call Azure OpenAI
+      const url = `${this.endpoint.replace(/\/$/, '')}/openai/deployments/${this.deployment}/chat/completions?api-version=${this.apiVersion}`;
+      
+      console.log(`[AI Agent] Calling Azure OpenAI: ${this.deployment}`);
+      
+      const response = await axios.post(
+        url,
+        {
+          messages: messages,
+          max_tokens: 1000,
+          temperature: 0.7,
+          top_p: 0.95,
+          frequency_penalty: 0,
+          presence_penalty: 0
+        },
+        {
+          headers: this.getHeaders(),
+          timeout: 30000
+        }
+      );
+
+      const assistantMessage = response.data?.choices?.[0]?.message?.content || 'I apologize, but I could not generate a response. Please try again.';
+      
+      // Add assistant response to history
+      messages.push({
+        role: 'assistant',
+        content: assistantMessage
       });
 
-      console.log(`[AI Agent] Run created: ${run.id}, waiting for completion...`);
-
-      // Poll for run completion
-      let runStatus = await this.client.agents.getRun(threadId, run.id);
-      let attempts = 0;
-      const maxAttempts = 30;
-
-      while (runStatus.status === 'queued' || runStatus.status === 'in_progress') {
-        if (attempts >= maxAttempts) {
-          throw new Error('Agent run timed out');
-        }
-        
-        console.log(`[AI Agent] Run status: ${runStatus.status} (attempt ${attempts + 1}/${maxAttempts})`);
-        await new Promise(resolve => setTimeout(resolve, 1000));
-        runStatus = await this.client.agents.getRun(threadId, run.id);
-        attempts++;
+      // Keep only last 10 messages to avoid token limits
+      if (messages.length > 11) {
+        const systemMessage = messages[0];
+        this.conversationHistory.set(threadId, [systemMessage, ...messages.slice(-10)]);
       }
 
-      if (runStatus.status === 'failed') {
-        console.error('[AI Agent] Run failed:', runStatus);
-        throw new Error(`Agent run failed: ${runStatus.lastError?.message || 'Unknown error'}`);
-      }
-
-      if (runStatus.status !== 'completed') {
-        console.error('[AI Agent] Unexpected run status:', runStatus.status);
-        throw new Error(`Unexpected run status: ${runStatus.status}`);
-      }
-
-      console.log('[AI Agent] Run completed, fetching messages...');
-
-      // Get messages from the thread
-      const messages = await this.client.agents.listMessages(threadId);
+      console.log(`[AI Agent] Response generated successfully`);
       
-      // Find the latest assistant message
-      const assistantMessages = messages.data
-        .filter((msg: any) => msg.role === 'assistant')
-        .sort((a: any, b: any) => b.createdAt - a.createdAt);
-
-      if (assistantMessages.length === 0) {
-        console.warn('[AI Agent] No assistant messages found');
-        return "I apologize, but I couldn't generate a response. Please try again.";
-      }
-
-      const latestMessage = assistantMessages[0];
-      
-      // Extract text content
-      let responseText = '';
-      if (latestMessage.content && Array.isArray(latestMessage.content)) {
-        for (const contentItem of latestMessage.content) {
-          if (contentItem.type === 'text' && contentItem.text) {
-            responseText += contentItem.text.value || contentItem.text;
-          }
-        }
-      } else if (typeof latestMessage.content === 'string') {
-        responseText = latestMessage.content;
-      }
-
-      if (!responseText) {
-        console.warn('[AI Agent] Empty response text');
-        return "I received your message but couldn't formulate a response. Please try rephrasing your question.";
-      }
-
-      console.log(`[AI Agent] Response generated (${responseText.length} chars)`);
-      return responseText;
-
+      return assistantMessage;
     } catch (err: any) {
-      console.error('[AI Agent] Error processing message:', {
+      console.error('[AI Agent] Error:', {
         message: err.message,
-        stack: err.stack,
-        response: err.response?.data
+        status: err.response?.status,
+        data: err.response?.data
       });
-      
-      // Return friendly error messages
-      if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
-        return "I'm having trouble authenticating with the AI service. Please check the configuration.";
-      } else if (err.message?.includes('429') || err.message?.includes('rate limit')) {
+
+      if (err.response?.status === 401) {
+        return "I'm having trouble connecting to the AI service. Please check the API configuration.";
+      } else if (err.response?.status === 429) {
         return "I'm currently experiencing high demand. Please try again in a moment.";
-      } else if (err.message?.includes('timeout')) {
-        return "The request took too long to process. Please try a simpler question.";
       } else {
-        return "I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.";
+        return "I apologize, but I encountered an error. Please try again.";
       }
     }
   }
 
-  /**
-   * Validate that the service is properly configured
-   */
   isConfigured(): boolean {
-    return !!(this.endpoint && this.apiKey && !this.demoMode);
+    return !this.demoMode;
   }
 
-  /**
-   * Check if running in demo mode
-   */
   isDemoMode(): boolean {
     return this.demoMode;
   }
