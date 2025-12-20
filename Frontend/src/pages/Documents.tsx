@@ -101,9 +101,40 @@ export const Documents = () => {
       }],
       additionalQualifications: []
     },
-    employment: {},
-    passport: {},
-    banking: {}
+    employment: {
+      employmentHistory: [{
+        company_name: '',
+        designation: '',
+        employment_start_date: '',
+        employment_end_date: '',
+        reason_for_leaving: '',
+        offer_letter_url: '',
+        experience_letter_url: '',
+        payslips_url: ''
+      }]
+    },
+    passport: {
+      has_passport: false,
+      passport_number: '',
+      passport_issue_date: '',
+      passport_expiry_date: '',
+      passport_copy_url: '',
+      has_visa: false,
+      visa_type: '',
+      visa_expiry_date: '',
+      visa_document_url: ''
+    },
+    banking: {
+      number_of_bank_accounts: 1,
+      bank_account_number: '',
+      ifsc_code: '',
+      name_as_per_bank: '',
+      bank_name: '',
+      branch: '',
+      cancelled_cheque_url: '',
+      uan_pf_number: '',
+      pran_nps_number: ''
+    }
   });
 
   const [touchedFields, setTouchedFields] = useState({});
@@ -296,6 +327,89 @@ export const Documents = () => {
               });
 
               console.log('✅ Form populated with saved education data');
+            }
+
+            // Handle saved employment data
+            if (result.savedEmployment) {
+              const saved = result.savedEmployment;
+              console.log('📋 Saved employment found:', saved);
+
+              const employmentHistory = saved.employmentHistory && saved.employmentHistory.length > 0
+                ? saved.employmentHistory.map(emp => ({
+                    company_name: emp.company_name || '',
+                    designation: emp.designation || '',
+                    employment_start_date: emp.employment_start_date ? new Date(emp.employment_start_date).toISOString().split('T')[0] : '',
+                    employment_end_date: emp.employment_end_date ? new Date(emp.employment_end_date).toISOString().split('T')[0] : '',
+                    reason_for_leaving: emp.reason_for_leaving || '',
+                    offer_letter_url: emp.offer_letter_url || '',
+                    experience_letter_url: emp.experience_letter_url || '',
+                    payslips_url: emp.payslips_url || ''
+                  }))
+                : [{
+                    company_name: '',
+                    designation: '',
+                    employment_start_date: '',
+                    employment_end_date: '',
+                    reason_for_leaving: '',
+                    offer_letter_url: '',
+                    experience_letter_url: '',
+                    payslips_url: ''
+                  }];
+
+              setFormData(prev => ({
+                ...prev,
+                employment: {
+                  employmentHistory: employmentHistory
+                }
+              }));
+
+              console.log('✅ Form populated with saved employment data');
+            }
+
+            // Handle saved passport/visa data
+            if (result.savedPassportVisa) {
+              const saved = result.savedPassportVisa;
+              console.log('📋 Saved passport/visa found:', saved);
+
+              setFormData(prev => ({
+                ...prev,
+                passport: {
+                  has_passport: saved.has_passport || false,
+                  passport_number: saved.passport_number || '',
+                  passport_issue_date: saved.passport_issue_date ? new Date(saved.passport_issue_date).toISOString().split('T')[0] : '',
+                  passport_expiry_date: saved.passport_expiry_date ? new Date(saved.passport_expiry_date).toISOString().split('T')[0] : '',
+                  passport_copy_url: saved.passport_copy_url || '',
+                  has_visa: saved.has_visa || false,
+                  visa_type: saved.visa_type || '',
+                  visa_expiry_date: saved.visa_expiry_date ? new Date(saved.visa_expiry_date).toISOString().split('T')[0] : '',
+                  visa_document_url: saved.visa_document_url || ''
+                }
+              }));
+
+              console.log('✅ Form populated with saved passport/visa data');
+            }
+
+            // Handle saved bank/pf/nps data
+            if (result.savedBankPfNps) {
+              const saved = result.savedBankPfNps;
+              console.log('📋 Saved bank/pf/nps found:', saved);
+
+              setFormData(prev => ({
+                ...prev,
+                banking: {
+                  number_of_bank_accounts: saved.number_of_bank_accounts || 1,
+                  bank_account_number: saved.bank_account_number || '',
+                  ifsc_code: saved.ifsc_code || '',
+                  name_as_per_bank: saved.name_as_per_bank || '',
+                  bank_name: saved.bank_name || '',
+                  branch: saved.branch || '',
+                  cancelled_cheque_url: saved.cancelled_cheque_url || '',
+                  uan_pf_number: saved.uan_pf_number || '',
+                  pran_nps_number: saved.pran_nps_number || ''
+                }
+              }));
+
+              console.log('✅ Form populated with saved bank/pf/nps data');
             }
 
             if (result.prefilledData && !result.savedDemographics) {
@@ -807,6 +921,107 @@ export const Documents = () => {
     return errors;
   };
 
+  // Validate employment section
+  const validateEmploymentSection = () => {
+    const errors = [];
+
+    // Check if at least one employment record exists
+    if (!formData.employment.employmentHistory || formData.employment.employmentHistory.length === 0) {
+      errors.push('At least one employment record is required');
+      return errors;
+    }
+
+    // Validate each employment record
+    formData.employment.employmentHistory.forEach((emp, index) => {
+      if (!emp.company_name || !emp.company_name.trim()) {
+        errors.push(`Employment ${index + 1}: Company name is required`);
+      }
+      if (!emp.designation || !emp.designation.trim()) {
+        errors.push(`Employment ${index + 1}: Designation is required`);
+      }
+      if (!emp.employment_start_date) {
+        errors.push(`Employment ${index + 1}: Start date is required`);
+      }
+      if (!emp.employment_end_date) {
+        errors.push(`Employment ${index + 1}: End date is required`);
+      }
+      // Validate date range
+      if (emp.employment_start_date && emp.employment_end_date) {
+        const startDate = new Date(emp.employment_start_date);
+        const endDate = new Date(emp.employment_end_date);
+        if (endDate < startDate) {
+          errors.push(`Employment ${index + 1}: End date must be after start date`);
+        }
+      }
+    });
+
+    return errors;
+  };
+
+  // Validate passport section
+  const validatePassportSection = () => {
+    const errors = [];
+
+    // If user has passport, validate passport fields
+    if (formData.passport.has_passport) {
+      if (!formData.passport.passport_number || !formData.passport.passport_number.trim()) {
+        errors.push('Passport number is required');
+      }
+      if (!formData.passport.passport_issue_date) {
+        errors.push('Passport issue date is required');
+      }
+      if (!formData.passport.passport_expiry_date) {
+        errors.push('Passport expiry date is required');
+      }
+      // Validate passport dates
+      if (formData.passport.passport_issue_date && formData.passport.passport_expiry_date) {
+        const issueDate = new Date(formData.passport.passport_issue_date);
+        const expiryDate = new Date(formData.passport.passport_expiry_date);
+        if (expiryDate <= issueDate) {
+          errors.push('Passport expiry date must be after issue date');
+        }
+      }
+    }
+
+    // If user has visa, validate visa fields
+    if (formData.passport.has_visa) {
+      if (!formData.passport.visa_type || !formData.passport.visa_type.trim()) {
+        errors.push('Visa type is required');
+      }
+      if (!formData.passport.visa_expiry_date) {
+        errors.push('Visa expiry date is required');
+      }
+    }
+
+    return errors;
+  };
+
+  // Validate banking section
+  const validateBankingSection = () => {
+    const errors = [];
+
+    // Bank account details are required
+    if (!formData.banking.bank_account_number || !formData.banking.bank_account_number.trim()) {
+      errors.push('Bank account number is required');
+    }
+    if (!formData.banking.ifsc_code || !formData.banking.ifsc_code.trim()) {
+      errors.push('IFSC code is required');
+    } else if (formData.banking.ifsc_code.length !== 11) {
+      errors.push('IFSC code must be 11 characters');
+    }
+    if (!formData.banking.name_as_per_bank || !formData.banking.name_as_per_bank.trim()) {
+      errors.push('Name as per bank is required');
+    }
+    if (!formData.banking.bank_name || !formData.banking.bank_name.trim()) {
+      errors.push('Bank name is required');
+    }
+    if (!formData.banking.branch || !formData.banking.branch.trim()) {
+      errors.push('Branch name is required');
+    }
+
+    return errors;
+  };
+
   // Save and navigate to next section
   const handleSaveAndNext = async () => {
     const section = sections[activeSection];
@@ -973,20 +1188,51 @@ export const Documents = () => {
           };
           break;
         case 'employment':
-          // Employment section is not yet implemented, skip saving
-          console.log('⏭️ Employment section not implemented yet, skipping save');
-          setLoading(false);
-          return;
+          apiEndpoint = '/api/documents/employment-history';
+          dataToSave = {
+            employmentHistory: formData.employment.employmentHistory.map(emp => ({
+              company_name: emp.company_name,
+              designation: emp.designation,
+              employment_start_date: emp.employment_start_date,
+              employment_end_date: emp.employment_end_date,
+              reason_for_leaving: emp.reason_for_leaving || '',
+              offer_letter_url: emp.offer_letter_url || null,
+              experience_letter_url: emp.experience_letter_url || null,
+              payslips_url: emp.payslips_url || null
+            }))
+          };
+          console.log('📤 Sending employment data:', dataToSave);
+          break;
         case 'passport':
-          // Passport section is not yet implemented, skip saving
-          console.log('⏭️ Passport section not implemented yet, skipping save');
-          setLoading(false);
-          return;
+          apiEndpoint = '/api/documents/passport-visa';
+          dataToSave = {
+            has_passport: formData.passport.has_passport,
+            passport_number: formData.passport.has_passport ? formData.passport.passport_number : null,
+            passport_issue_date: formData.passport.has_passport ? formData.passport.passport_issue_date : null,
+            passport_expiry_date: formData.passport.has_passport ? formData.passport.passport_expiry_date : null,
+            passport_copy_url: formData.passport.has_passport ? formData.passport.passport_copy_url : null,
+            has_visa: formData.passport.has_visa,
+            visa_type: formData.passport.has_visa ? formData.passport.visa_type : null,
+            visa_expiry_date: formData.passport.has_visa ? formData.passport.visa_expiry_date : null,
+            visa_document_url: formData.passport.has_visa ? formData.passport.visa_document_url : null
+          };
+          console.log('📤 Sending passport/visa data:', dataToSave);
+          break;
         case 'banking':
-          // Banking section is not yet implemented, skip saving
-          console.log('⏭️ Banking section not implemented yet, skipping save');
-          setLoading(false);
-          return;
+          apiEndpoint = '/api/documents/bank-pf-nps';
+          dataToSave = {
+            number_of_bank_accounts: formData.banking.number_of_bank_accounts,
+            bank_account_number: formData.banking.bank_account_number,
+            ifsc_code: formData.banking.ifsc_code,
+            name_as_per_bank: formData.banking.name_as_per_bank,
+            bank_name: formData.banking.bank_name,
+            branch: formData.banking.branch,
+            cancelled_cheque_url: formData.banking.cancelled_cheque_url || null,
+            uan_pf_number: formData.banking.uan_pf_number || null,
+            pran_nps_number: formData.banking.pran_nps_number || null
+          };
+          console.log('📤 Sending bank/pf/nps data:', dataToSave);
+          break;
         default:
           console.log('No API endpoint for section:', section.id);
           setLoading(false);
@@ -1061,6 +1307,12 @@ export const Documents = () => {
       validationErrors = validatePersonalSection();
     } else if (section.id === 'education') {
       validationErrors = validateEducationSection();
+    } else if (section.id === 'employment') {
+      validationErrors = validateEmploymentSection();
+    } else if (section.id === 'passport') {
+      validationErrors = validatePassportSection();
+    } else if (section.id === 'banking') {
+      validationErrors = validateBankingSection();
     }
     
     if (validationErrors.length > 0) {
@@ -2660,31 +2912,684 @@ export const Documents = () => {
 
       case 'employment':
         return (
-          <div style={{ padding: '20px' }}>
-            <h3 style={{ color: 'black', marginBottom: '20px', fontSize: '20px' }}>Employment History</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
-              Share your previous work experience and employment details.
-            </p>
+          <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+            <h2 style={{ color: '#1f2937', marginBottom: '30px', fontSize: '24px', fontWeight: '600' }}>
+              Employment History
+            </h2>
+
+            {formData.employment.employmentHistory.map((emp, index) => (
+              <div key={index} style={{ 
+                marginBottom: '30px', 
+                padding: '20px', 
+                backgroundColor: '#f9fafb', 
+                borderRadius: '12px',
+                border: '1px solid #e5e7eb'
+              }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '20px' }}>
+                  <h3 style={{ color: '#374151', fontSize: '16px', fontWeight: '600' }}>
+                    Employment Record #{index + 1}
+                  </h3>
+                  {formData.employment.employmentHistory.length > 1 && (
+                    <button
+                      onClick={() => {
+                        setFormData(prev => ({
+                          ...prev,
+                          employment: {
+                            ...prev.employment,
+                            employmentHistory: prev.employment.employmentHistory.filter((_, i) => i !== index)
+                          }
+                        }));
+                      }}
+                      style={{
+                        padding: '6px 12px',
+                        backgroundColor: '#ef4444',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '6px',
+                        fontSize: '12px',
+                        cursor: 'pointer',
+                        fontWeight: '500'
+                      }}
+                    >
+                      Remove
+                    </button>
+                  )}
+                </div>
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Company Name *
+                    </label>
+                    <input
+                      type="text"
+                      value={emp.company_name}
+                      onChange={(e) => {
+                        const newHistory = [...formData.employment.employmentHistory];
+                        newHistory[index].company_name = e.target.value;
+                        setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                      }}
+                      placeholder="Enter company name"
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Designation *
+                    </label>
+                    <input
+                      type="text"
+                      value={emp.designation}
+                      onChange={(e) => {
+                        const newHistory = [...formData.employment.employmentHistory];
+                        newHistory[index].designation = e.target.value;
+                        setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                      }}
+                      placeholder="Enter your designation"
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Start Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={emp.employment_start_date}
+                      onChange={(e) => {
+                        const newHistory = [...formData.employment.employmentHistory];
+                        newHistory[index].employment_start_date = e.target.value;
+                        setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      End Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={emp.employment_end_date}
+                      onChange={(e) => {
+                        const newHistory = [...formData.employment.employmentHistory];
+                        newHistory[index].employment_end_date = e.target.value;
+                        setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                      }}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div style={{ gridColumn: '1 / -1' }}>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Reason for Leaving
+                    </label>
+                    <textarea
+                      value={emp.reason_for_leaving}
+                      onChange={(e) => {
+                        const newHistory = [...formData.employment.employmentHistory];
+                        newHistory[index].reason_for_leaving = e.target.value;
+                        setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                      }}
+                      placeholder="Enter reason for leaving"
+                      rows={2}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px',
+                        resize: 'vertical'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Offer Letter
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          // TODO: Implement file upload to blob storage
+                          const fileName = e.target.files[0].name;
+                          const newHistory = [...formData.employment.employmentHistory];
+                          newHistory[index].offer_letter_url = fileName;
+                          setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                        }
+                      }}
+                      style={{ fontSize: '12px' }}
+                    />
+                    {emp.offer_letter_url && (
+                      <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
+                        ✓ {emp.offer_letter_url}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Experience Letter
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const fileName = e.target.files[0].name;
+                          const newHistory = [...formData.employment.employmentHistory];
+                          newHistory[index].experience_letter_url = fileName;
+                          setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                        }
+                      }}
+                      style={{ fontSize: '12px' }}
+                    />
+                    {emp.experience_letter_url && (
+                      <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
+                        ✓ {emp.experience_letter_url}
+                      </div>
+                    )}
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Payslips
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          const fileName = e.target.files[0].name;
+                          const newHistory = [...formData.employment.employmentHistory];
+                          newHistory[index].payslips_url = fileName;
+                          setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                        }
+                      }}
+                      style={{ fontSize: '12px' }}
+                    />
+                    {emp.payslips_url && (
+                      <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
+                        ✓ {emp.payslips_url}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+
+            <button
+              onClick={() => {
+                setFormData(prev => ({
+                  ...prev,
+                  employment: {
+                    ...prev.employment,
+                    employmentHistory: [
+                      ...prev.employment.employmentHistory,
+                      {
+                        company_name: '',
+                        designation: '',
+                        employment_start_date: '',
+                        employment_end_date: '',
+                        reason_for_leaving: '',
+                        offer_letter_url: '',
+                        experience_letter_url: '',
+                        payslips_url: ''
+                      }
+                    ]
+                  }
+                }));
+              }}
+              style={{
+                padding: '12px 24px',
+                backgroundColor: '#3b82f6',
+                color: 'white',
+                border: 'none',
+                borderRadius: '8px',
+                fontSize: '14px',
+                fontWeight: '500',
+                cursor: 'pointer',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px'
+              }}
+            >
+              <span>+ Add Another Employment</span>
+            </button>
           </div>
         );
 
       case 'passport':
         return (
-          <div style={{ padding: '20px' }}>
-            <h3 style={{ color: 'black', marginBottom: '20px', fontSize: '20px' }}>Passport & Visa Information</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
-              Upload your passport and visa documents for identity verification.
-            </p>
+          <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+            <h2 style={{ color: '#1f2937', marginBottom: '30px', fontSize: '24px', fontWeight: '600' }}>
+              Passport & Visa Information
+            </h2>
+
+            {/* Passport Section */}
+            <div style={{ marginBottom: '40px', padding: '20px', backgroundColor: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+              <h3 style={{ color: '#374151', marginBottom: '20px', fontSize: '18px', fontWeight: '500' }}>
+                Passport Details
+              </h3>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.passport.has_passport}
+                    onChange={(e) => handleInputChange('passport', 'has_passport', e.target.checked)}
+                    style={{ marginRight: '8px', width: '16px', height: '16px' }}
+                  />
+                  <span style={{ color: '#374151', fontSize: '14px', fontWeight: '500' }}>I have a passport</span>
+                </label>
+              </div>
+
+              {formData.passport.has_passport && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Passport Number *
+                    </label>
+                    <input
+                      type="text"
+                      value={formData.passport.passport_number}
+                      onChange={(e) => handleInputChange('passport', 'passport_number', e.target.value)}
+                      placeholder="Enter passport number"
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Issue Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.passport.passport_issue_date}
+                      onChange={(e) => handleInputChange('passport', 'passport_issue_date', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Expiry Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.passport.passport_expiry_date}
+                      onChange={(e) => handleInputChange('passport', 'passport_expiry_date', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Passport Copy
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleInputChange('passport', 'passport_copy_url', e.target.files[0].name);
+                        }
+                      }}
+                      style={{ fontSize: '12px' }}
+                    />
+                    {formData.passport.passport_copy_url && (
+                      <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
+                        ✓ {formData.passport.passport_copy_url}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
+
+            {/* Visa Section */}
+            <div style={{ padding: '20px', backgroundColor: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+              <h3 style={{ color: '#374151', marginBottom: '20px', fontSize: '18px', fontWeight: '500' }}>
+                Visa Details
+              </h3>
+
+              <div style={{ marginBottom: '20px' }}>
+                <label style={{ display: 'flex', alignItems: 'center', cursor: 'pointer' }}>
+                  <input
+                    type="checkbox"
+                    checked={formData.passport.has_visa}
+                    onChange={(e) => handleInputChange('passport', 'has_visa', e.target.checked)}
+                    style={{ marginRight: '8px', width: '16px', height: '16px' }}
+                  />
+                  <span style={{ color: '#374151', fontSize: '14px', fontWeight: '500' }}>I have a visa</span>
+                </label>
+              </div>
+
+              {formData.passport.has_visa && (
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Visa Type *
+                    </label>
+                    <select
+                      value={formData.passport.visa_type}
+                      onChange={(e) => handleInputChange('passport', 'visa_type', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    >
+                      <option value="">Select Visa Type</option>
+                      <option value="Work Visa">Work Visa</option>
+                      <option value="Student Visa">Student Visa</option>
+                      <option value="Tourist Visa">Tourist Visa</option>
+                      <option value="Business Visa">Business Visa</option>
+                      <option value="H1B">H1B</option>
+                      <option value="L1">L1</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Visa Expiry Date *
+                    </label>
+                    <input
+                      type="date"
+                      value={formData.passport.visa_expiry_date}
+                      onChange={(e) => handleInputChange('passport', 'visa_expiry_date', e.target.value)}
+                      style={{
+                        width: '100%',
+                        padding: '10px',
+                        border: '1px solid #d1d5db',
+                        borderRadius: '8px',
+                        fontSize: '14px'
+                      }}
+                    />
+                  </div>
+
+                  <div>
+                    <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                      Visa Document
+                    </label>
+                    <input
+                      type="file"
+                      accept=".pdf,.jpg,.jpeg,.png"
+                      onChange={(e) => {
+                        if (e.target.files && e.target.files[0]) {
+                          handleInputChange('passport', 'visa_document_url', e.target.files[0].name);
+                        }
+                      }}
+                      style={{ fontSize: '12px' }}
+                    />
+                    {formData.passport.visa_document_url && (
+                      <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
+                        ✓ {formData.passport.visa_document_url}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         );
 
       case 'banking':
         return (
-          <div style={{ padding: '20px' }}>
-            <h3 style={{ color: 'black', marginBottom: '20px', fontSize: '20px' }}>Banking & Financial Information</h3>
-            <p style={{ color: '#6b7280', fontSize: '14px', marginBottom: '20px' }}>
-              Provide your banking details for salary processing and PF information.
-            </p>
+          <div style={{ padding: '20px', maxWidth: '1200px', margin: '0 auto' }}>
+            <h2 style={{ color: '#1f2937', marginBottom: '30px', fontSize: '24px', fontWeight: '600' }}>
+              Bank, PF & NPS Information
+            </h2>
+
+            {/* Bank Details Section */}
+            <div style={{ marginBottom: '40px', padding: '20px', backgroundColor: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+              <h3 style={{ color: '#374151', marginBottom: '20px', fontSize: '18px', fontWeight: '500' }}>
+                Bank Account Details
+              </h3>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                    Number of Bank Accounts
+                  </label>
+                  <select
+                    value={formData.banking.number_of_bank_accounts}
+                    onChange={(e) => handleInputChange('banking', 'number_of_bank_accounts', parseInt(e.target.value))}
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  >
+                    <option value="1">1</option>
+                    <option value="2">2</option>
+                    <option value="3">3</option>
+                    <option value="4">4</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                    Bank Account Number *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.banking.bank_account_number}
+                    onChange={(e) => handleInputChange('banking', 'bank_account_number', e.target.value)}
+                    placeholder="Enter account number"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                    IFSC Code *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.banking.ifsc_code}
+                    onChange={(e) => handleInputChange('banking', 'ifsc_code', e.target.value.toUpperCase())}
+                    placeholder="Enter IFSC code"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                    Name as per Bank *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.banking.name_as_per_bank}
+                    onChange={(e) => handleInputChange('banking', 'name_as_per_bank', e.target.value)}
+                    placeholder="Enter name as per bank records"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                    Bank Name *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.banking.bank_name}
+                    onChange={(e) => handleInputChange('banking', 'bank_name', e.target.value)}
+                    placeholder="Enter bank name"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                    Branch *
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.banking.branch}
+                    onChange={(e) => handleInputChange('banking', 'branch', e.target.value)}
+                    placeholder="Enter branch name"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                    Cancelled Cheque
+                  </label>
+                  <input
+                    type="file"
+                    accept=".pdf,.jpg,.jpeg,.png"
+                    onChange={(e) => {
+                      if (e.target.files && e.target.files[0]) {
+                        handleInputChange('banking', 'cancelled_cheque_url', e.target.files[0].name);
+                      }
+                    }}
+                    style={{ fontSize: '12px' }}
+                  />
+                  {formData.banking.cancelled_cheque_url && (
+                    <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
+                      ✓ {formData.banking.cancelled_cheque_url}
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* PF & NPS Section */}
+            <div style={{ padding: '20px', backgroundColor: '#f9fafb', borderRadius: '12px', border: '1px solid #e5e7eb' }}>
+              <h3 style={{ color: '#374151', marginBottom: '20px', fontSize: '18px', fontWeight: '500' }}>
+                PF & NPS Details
+              </h3>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '20px' }}>
+                <div>
+                  <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                    UAN / PF Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.banking.uan_pf_number}
+                    onChange={(e) => handleInputChange('banking', 'uan_pf_number', e.target.value)}
+                    placeholder="Enter UAN or PF number"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                    Universal Account Number for Provident Fund
+                  </p>
+                </div>
+
+                <div>
+                  <label style={{ display: 'block', color: '#374151', fontSize: '14px', fontWeight: '500', marginBottom: '8px' }}>
+                    PRAN / NPS Number
+                  </label>
+                  <input
+                    type="text"
+                    value={formData.banking.pran_nps_number}
+                    onChange={(e) => handleInputChange('banking', 'pran_nps_number', e.target.value)}
+                    placeholder="Enter PRAN or NPS number"
+                    style={{
+                      width: '100%',
+                      padding: '10px',
+                      border: '1px solid #d1d5db',
+                      borderRadius: '8px',
+                      fontSize: '14px'
+                    }}
+                  />
+                  <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                    Permanent Retirement Account Number for NPS
+                  </p>
+                </div>
+              </div>
+            </div>
           </div>
         );
 

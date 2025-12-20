@@ -110,11 +110,52 @@ interface Education {
   document_url?: string;  // Actual field from educational_details table
 }
 
+interface Employment {
+  id: number;
+  company_name: string;
+  designation: string;
+  employment_start_date: string;
+  employment_end_date: string;
+  reason_for_leaving?: string;
+  offer_letter_url?: string;
+  experience_letter_url?: string;
+  payslips_url?: string;
+}
+
+interface PassportVisa {
+  id: number;
+  has_passport: boolean;
+  passport_number?: string;
+  passport_issue_date?: string;
+  passport_expiry_date?: string;
+  passport_copy_url?: string;
+  has_visa: boolean;
+  visa_type?: string;
+  visa_expiry_date?: string;
+  visa_document_url?: string;
+}
+
+interface BankPfNps {
+  id: number;
+  number_of_bank_accounts: number;
+  bank_account_number: string;
+  ifsc_code: string;
+  name_as_per_bank: string;
+  bank_name: string;
+  branch: string;
+  cancelled_cheque_url?: string;
+  uan_pf_number?: string;
+  pran_nps_number?: string;
+}
+
 interface BGVData {
   fresher: FresherInfo;
   demographics: Demographics | null;
   personal: Personal | null;
   education: Education[];
+  employment: Employment[];
+  passportVisa: PassportVisa | null;
+  bankPfNps: BankPfNps | null;
   submission: any;
 }
 
@@ -136,7 +177,7 @@ export const HrBGVVerification = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [bgvData, setBgvData] = useState<BGVData | null>(null);
-  const [activeTab, setActiveTab] = useState<'demographics' | 'personal' | 'education'>('demographics');
+  const [activeTab, setActiveTab] = useState<'demographics' | 'personal' | 'education' | 'employment' | 'passport' | 'banking'>('demographics');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [showImageModal, setShowImageModal] = useState(false);
   const [processing, setProcessing] = useState(false);
@@ -293,6 +334,12 @@ export const HrBGVVerification = () => {
           .filter(([key]) => !key.toLowerCase().includes('file_type'))
           .filter(([key]) => !key.toLowerCase().includes('file_size'))
           .filter(([key]) => !key.toLowerCase().includes('certificate_name'))
+          .filter(([key]) => {
+            const lowerKey = key.toLowerCase();
+            return lowerKey !== 'emergency_contact_name' && 
+                   lowerKey !== 'emergency_contact_phone' && 
+                   lowerKey !== 'emergency_contact_relationship';
+          })
           .map(([key, value]) => {
             const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             const verificationKey = `Personal-${docType}`;
@@ -335,6 +382,89 @@ export const HrBGVVerification = () => {
               };
             })
         );
+      }
+      
+      // Employment section
+      if (result.data.employment && result.data.employment.length > 0) {
+        const employmentFields = ['company_name', 'designation', 'employment_start_date', 'employment_end_date', 'reason_for_leaving'];
+        
+        verificationsData['Employment'] = result.data.employment.flatMap((emp: Employment) => 
+          Object.entries(emp)
+            .filter(([key]) => employmentFields.includes(key))
+            .map(([key, value]) => {
+              const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              const verificationKey = `Employment-${docType}`;
+              const savedStatus = verificationMap.get(verificationKey);
+              
+              return {
+                document_type: docType,
+                document_section: 'Employment',
+                document_value: value,
+                status: (savedStatus?.status || 'pending') as 'pending' | 'verified' | 'rejected',
+                comments: savedStatus?.comments,
+                verified_at: savedStatus?.verified_at,
+                hr_first_name: savedStatus?.hr_first_name,
+                hr_last_name: savedStatus?.hr_last_name
+              };
+            })
+        );
+      }
+      
+      // Passport & Visa section
+      if (result.data.passportVisa) {
+        verificationsData['Passport'] = Object.entries(result.data.passportVisa)
+          .filter(([key]) => !['id', 'fresher_id', 'created_at', 'updated_at'].includes(key))
+          .filter(([key]) => !key.toLowerCase().includes('_url'))
+          .map(([key, value]) => {
+            const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const verificationKey = `Passport-${docType}`;
+            const savedStatus = verificationMap.get(verificationKey);
+            
+            return {
+              document_type: docType,
+              document_section: 'Passport',
+              document_value: value,
+              status: (savedStatus?.status || 'pending') as 'pending' | 'verified' | 'rejected',
+              comments: savedStatus?.comments,
+              verified_at: savedStatus?.verified_at,
+              hr_first_name: savedStatus?.hr_first_name,
+              hr_last_name: savedStatus?.hr_last_name
+            };
+          });
+      }
+      
+      // Bank/PF/NPS section
+      if (result.data.bankPfNps) {
+        verificationsData['Banking'] = Object.entries(result.data.bankPfNps)
+          .filter(([key]) => !['id', 'fresher_id', 'created_at', 'updated_at'].includes(key))
+          .filter(([key]) => !key.toLowerCase().includes('_url'))
+          .map(([key, value]) => {
+            const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const verificationKey = `Banking-${docType}`;
+            const savedStatus = verificationMap.get(verificationKey);
+            
+            return {
+              document_type: docType,
+              document_section: 'Banking',
+              document_value: value,
+              status: (savedStatus?.status || 'pending') as 'pending' | 'verified' | 'rejected',
+              comments: savedStatus?.comments,
+              verified_at: savedStatus?.verified_at,
+              hr_first_name: savedStatus?.hr_first_name,
+              hr_last_name: savedStatus?.hr_last_name
+            };
+          });
+      }
+      
+      // Initialize empty arrays for sections that don't have data yet
+      if (!verificationsData['Employment']) {
+        verificationsData['Employment'] = [];
+      }
+      if (!verificationsData['Passport']) {
+        verificationsData['Passport'] = [];
+      }
+      if (!verificationsData['Banking']) {
+        verificationsData['Banking'] = [];
       }
       
       setVerifications(verificationsData);
@@ -484,6 +614,12 @@ export const HrBGVVerification = () => {
           .filter(([key]) => !key.toLowerCase().includes('file_type'))
           .filter(([key]) => !key.toLowerCase().includes('file_size'))
           .filter(([key]) => !key.toLowerCase().includes('certificate_name'))
+          .filter(([key]) => {
+            const lowerKey = key.toLowerCase();
+            return lowerKey !== 'emergency_contact_name' && 
+                   lowerKey !== 'emergency_contact_phone' && 
+                   lowerKey !== 'emergency_contact_relationship';
+          })
           .map(([key, value]) => {
             const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
             const verificationKey = `Personal-${docType}`;
@@ -718,7 +854,7 @@ export const HrBGVVerification = () => {
   };
 
   const getTotalSectionsVerified = () => {
-    const sections = ['Demographics', 'Personal', 'Education'];
+    const sections = ['Demographics', 'Personal', 'Education', 'Employment', 'Passport', 'Banking'];
     const verifiedSections = sections.filter(section => {
       const status = getSectionVerificationStatus(section);
       return status.allVerified;
@@ -855,6 +991,42 @@ export const HrBGVVerification = () => {
     } catch (error: any) {
       console.error('Error viewing document:', error);
       alert(error.message || 'Error opening document');
+    }
+  };
+
+  const renderEmergencyContacts = (value: any) => {
+    try {
+      const contacts = typeof value === 'string' ? JSON.parse(value) : value;
+      if (!Array.isArray(contacts) || contacts.length === 0) return 'Not provided';
+      
+      return (
+        <table style={{
+          width: '100%',
+          borderCollapse: 'collapse',
+          fontSize: '14px',
+          marginTop: '8px'
+        }}>
+          <thead>
+            <tr style={{ backgroundColor: '#f9fafb' }}>
+              <th style={{ padding: '8px', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: '600' }}>Name</th>
+              <th style={{ padding: '8px', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: '600' }}>Mobile</th>
+              <th style={{ padding: '8px', textAlign: 'left', border: '1px solid #e5e7eb', fontWeight: '600' }}>Relationship</th>
+            </tr>
+          </thead>
+          <tbody>
+            {contacts.map((contact: any, index: number) => (
+              <tr key={index}>
+                <td style={{ padding: '8px', border: '1px solid #e5e7eb' }}>{contact.contact_person_name || contact.name || 'N/A'}</td>
+                <td style={{ padding: '8px', border: '1px solid #e5e7eb' }}>{contact.mobile || 'N/A'}</td>
+                <td style={{ padding: '8px', border: '1px solid #e5e7eb' }}>{contact.relationship || 'N/A'}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      );
+    } catch (error) {
+      console.error('Error parsing emergency contacts:', error);
+      return 'Invalid format';
     }
   };
 
@@ -1361,6 +1533,7 @@ export const HrBGVVerification = () => {
                     const status = getStatusBadge(doc.status || 'pending');
                     const docKey = `${doc.document_section}-${doc.document_type}`;
                     const isProcessing = processingDocs.has(docKey);
+                    const isEmergencyContacts = doc.document_type.toLowerCase().includes('emergency contact');
                     
                     return (
                       <tr key={idx} style={{
@@ -1379,7 +1552,34 @@ export const HrBGVVerification = () => {
                           color: '#6b7280',
                           wordBreak: 'break-word'
                         }}>
-                          {formatValue(doc.document_value, doc.document_type)}
+                          {isEmergencyContacts ? (
+                            renderEmergencyContacts(doc.document_value)
+                          ) : (
+                            <>
+                              {formatValue(doc.document_value, doc.document_type)}
+                              {isDocumentField(doc.document_type, doc.document_value) && (
+                                <button
+                                  onClick={() => handleViewDocument(doc.document_value, doc.document_type)}
+                                  style={{
+                                    marginLeft: '12px',
+                                    padding: '6px 12px',
+                                    backgroundColor: '#3b82f6',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '6px',
+                                    cursor: 'pointer',
+                                    fontSize: '12px',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    gap: '4px'
+                                  }}
+                                >
+                                  <FiFile style={{ width: '14px', height: '14px' }} />
+                                  View Document
+                                </button>
+                              )}
+                            </>
+                          )}
                           {doc.comments && (
                             <div style={{
                               marginTop: '8px',
@@ -1829,6 +2029,654 @@ export const HrBGVVerification = () => {
                       </tr>
                     );
                   })}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Employment History Section */}
+        {verifications['Employment'] && (
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb',
+            overflow: 'hidden',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '700',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                Employment History
+              </h3>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: getSectionVerificationStatus('Employment').allVerified ? '#10b981' : '#eab308',
+                padding: '6px 12px',
+                backgroundColor: getSectionVerificationStatus('Employment').allVerified ? '#d1fae5' : '#fef9c3',
+                borderRadius: '12px'
+              }}>
+                {getSectionVerificationStatus('Employment').verified} / {getSectionVerificationStatus('Employment').total} verified
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '14px'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f9fafb' }}>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '30%'
+                    }}>Property</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '50%'
+                    }}>Value</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '20%'
+                    }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {verifications['Employment'].length === 0 ? (
+                    <tr>
+                      <td colSpan={3} style={{
+                        padding: '40px',
+                        textAlign: 'center',
+                        color: '#9ca3af',
+                        fontSize: '14px'
+                      }}>
+                        No employment history data submitted yet
+                      </td>
+                    </tr>
+                  ) : (
+                    verifications['Employment'].map((doc, idx) => {
+                      const status = getStatusBadge(doc.status || 'pending');
+                      const docKey = `${doc.document_section}-${doc.document_type}`;
+                      const isProcessing = processingDocs.has(docKey);
+                      
+                      return (
+                      <tr key={idx} style={{
+                        borderBottom: '1px solid #e5e7eb',
+                        backgroundColor: idx % 2 === 0 ? 'white' : '#f9fafb'
+                      }}>
+                        <td style={{
+                          padding: '12px 16px',
+                          fontWeight: '500',
+                          color: '#1f2937'
+                        }}>
+                          {doc.document_type}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          color: '#6b7280',
+                          wordBreak: 'break-word'
+                        }}>
+                          {formatValue(doc.document_value, doc.document_type)}
+                          {doc.comments && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              backgroundColor: '#fef2f2',
+                              borderRadius: '4px',
+                              borderLeft: '3px solid #ef4444',
+                              fontSize: '12px'
+                            }}>
+                              <strong style={{ color: '#991b1b' }}>Rejection: </strong>
+                              <span style={{ color: '#7f1d1d' }}>{doc.comments}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}>
+                            {isProcessing ? (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                color: '#6b7280',
+                                fontSize: '11px'
+                              }}>
+                                <div style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  border: '2px solid #e5e7eb',
+                                  borderTop: '2px solid #3b82f6',
+                                  borderRadius: '50%',
+                                  animation: 'spin 0.6s linear infinite'
+                                }} />
+                                Processing...
+                              </div>
+                            ) : doc.status === 'verified' || doc.status === 'rejected' ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: status.bgColor,
+                                color: status.color,
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '600'
+                              }}>
+                                {status.icon}
+                                {status.label}
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleVerify(doc)}
+                                  disabled={isProcessing}
+                                  title="Verify"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#10b981',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiCheckCircle size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleReject(doc)}
+                                  disabled={isProcessing}
+                                  title="Reject"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiX size={16} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Passport & Visa Section */}
+        {verifications['Passport'] && (
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb',
+            overflow: 'hidden',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '700',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                Passport & Visa
+              </h3>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: getSectionVerificationStatus('Passport').allVerified ? '#10b981' : '#eab308',
+                padding: '6px 12px',
+                backgroundColor: getSectionVerificationStatus('Passport').allVerified ? '#d1fae5' : '#fef9c3',
+                borderRadius: '12px'
+              }}>
+                {getSectionVerificationStatus('Passport').verified} / {getSectionVerificationStatus('Passport').total} verified
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '14px'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f9fafb' }}>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '30%'
+                    }}>Property</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '50%'
+                    }}>Value</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '20%'
+                    }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {verifications['Passport'].length === 0 ? (
+                    <tr>
+                      <td colSpan={3} style={{
+                        padding: '40px',
+                        textAlign: 'center',
+                        color: '#9ca3af',
+                        fontSize: '14px'
+                      }}>
+                        No passport/visa data submitted yet
+                      </td>
+                    </tr>
+                  ) : (
+                    verifications['Passport'].map((doc, idx) => {
+                      const status = getStatusBadge(doc.status || 'pending');
+                      const docKey = `${doc.document_section}-${doc.document_type}`;
+                      const isProcessing = processingDocs.has(docKey);
+                      
+                      return (
+                      <tr key={idx} style={{
+                        borderBottom: '1px solid #e5e7eb',
+                        backgroundColor: idx % 2 === 0 ? 'white' : '#f9fafb'
+                      }}>
+                        <td style={{
+                          padding: '12px 16px',
+                          fontWeight: '500',
+                          color: '#1f2937'
+                        }}>
+                          {doc.document_type}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          color: '#6b7280',
+                          wordBreak: 'break-word'
+                        }}>
+                          {formatValue(doc.document_value, doc.document_type)}
+                          {doc.comments && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              backgroundColor: '#fef2f2',
+                              borderRadius: '4px',
+                              borderLeft: '3px solid #ef4444',
+                              fontSize: '12px'
+                            }}>
+                              <strong style={{ color: '#991b1b' }}>Rejection: </strong>
+                              <span style={{ color: '#7f1d1d' }}>{doc.comments}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}>
+                            {isProcessing ? (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                color: '#6b7280',
+                                fontSize: '11px'
+                              }}>
+                                <div style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  border: '2px solid #e5e7eb',
+                                  borderTop: '2px solid #3b82f6',
+                                  borderRadius: '50%',
+                                  animation: 'spin 0.6s linear infinite'
+                                }} />
+                                Processing...
+                              </div>
+                            ) : doc.status === 'verified' || doc.status === 'rejected' ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: status.bgColor,
+                                color: status.color,
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '600'
+                              }}>
+                                {status.icon}
+                                {status.label}
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleVerify(doc)}
+                                  disabled={isProcessing}
+                                  title="Verify"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#10b981',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiCheckCircle size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleReject(doc)}
+                                  disabled={isProcessing}
+                                  title="Reject"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiX size={16} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Bank/PF/NPS Section */}
+        {verifications['Banking'] && (
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            border: '1px solid #e5e7eb',
+            overflow: 'hidden',
+            boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)'
+          }}>
+            <div style={{
+              padding: '20px 24px',
+              borderBottom: '1px solid #e5e7eb',
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center'
+            }}>
+              <h3 style={{
+                fontSize: '18px',
+                fontWeight: '700',
+                color: '#1f2937',
+                margin: 0
+              }}>
+                Bank/PF/NPS Details
+              </h3>
+              <div style={{
+                fontSize: '14px',
+                fontWeight: '600',
+                color: getSectionVerificationStatus('Banking').allVerified ? '#10b981' : '#eab308',
+                padding: '6px 12px',
+                backgroundColor: getSectionVerificationStatus('Banking').allVerified ? '#d1fae5' : '#fef9c3',
+                borderRadius: '12px'
+              }}>
+                {getSectionVerificationStatus('Banking').verified} / {getSectionVerificationStatus('Banking').total} verified
+              </div>
+            </div>
+
+            <div style={{ overflowX: 'auto' }}>
+              <table style={{
+                width: '100%',
+                borderCollapse: 'collapse',
+                fontSize: '14px'
+              }}>
+                <thead>
+                  <tr style={{ backgroundColor: '#f9fafb' }}>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '30%'
+                    }}>Property</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'left',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '50%'
+                    }}>Value</th>
+                    <th style={{
+                      padding: '12px 16px',
+                      textAlign: 'center',
+                      fontWeight: '600',
+                      color: '#374151',
+                      borderBottom: '2px solid #e5e7eb',
+                      width: '20%'
+                    }}>Action</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {verifications['Banking'].length === 0 ? (
+                    <tr>
+                      <td colSpan={3} style={{
+                        padding: '40px',
+                        textAlign: 'center',
+                        color: '#9ca3af',
+                        fontSize: '14px'
+                      }}>
+                        No bank/PF/NPS data submitted yet
+                      </td>
+                    </tr>
+                  ) : (
+                    verifications['Banking'].map((doc, idx) => {
+                      const status = getStatusBadge(doc.status || 'pending');
+                      const docKey = `${doc.document_section}-${doc.document_type}`;
+                      const isProcessing = processingDocs.has(docKey);
+                    
+                    return (
+                      <tr key={idx} style={{
+                        borderBottom: '1px solid #e5e7eb',
+                        backgroundColor: idx % 2 === 0 ? 'white' : '#f9fafb'
+                      }}>
+                        <td style={{
+                          padding: '12px 16px',
+                          fontWeight: '500',
+                          color: '#1f2937'
+                        }}>
+                          {doc.document_type}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          color: '#6b7280',
+                          wordBreak: 'break-word'
+                        }}>
+                          {formatValue(doc.document_value, doc.document_type)}
+                          {doc.comments && (
+                            <div style={{
+                              marginTop: '8px',
+                              padding: '8px',
+                              backgroundColor: '#fef2f2',
+                              borderRadius: '4px',
+                              borderLeft: '3px solid #ef4444',
+                              fontSize: '12px'
+                            }}>
+                              <strong style={{ color: '#991b1b' }}>Rejection: </strong>
+                              <span style={{ color: '#7f1d1d' }}>{doc.comments}</span>
+                            </div>
+                          )}
+                        </td>
+                        <td style={{
+                          padding: '12px 16px',
+                          textAlign: 'center'
+                        }}>
+                          <div style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            gap: '6px'
+                          }}>
+                            {isProcessing ? (
+                              <div style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                color: '#6b7280',
+                                fontSize: '11px'
+                              }}>
+                                <div style={{
+                                  width: '16px',
+                                  height: '16px',
+                                  border: '2px solid #e5e7eb',
+                                  borderTop: '2px solid #3b82f6',
+                                  borderRadius: '50%',
+                                  animation: 'spin 0.6s linear infinite'
+                                }} />
+                                Processing...
+                              </div>
+                            ) : doc.status === 'verified' || doc.status === 'rejected' ? (
+                              <span style={{
+                                display: 'inline-flex',
+                                alignItems: 'center',
+                                gap: '4px',
+                                padding: '4px 8px',
+                                backgroundColor: status.bgColor,
+                                color: status.color,
+                                borderRadius: '12px',
+                                fontSize: '11px',
+                                fontWeight: '600'
+                              }}>
+                                {status.icon}
+                                {status.label}
+                              </span>
+                            ) : (
+                              <>
+                                <button
+                                  onClick={() => handleVerify(doc)}
+                                  disabled={isProcessing}
+                                  title="Verify"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#10b981',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiCheckCircle size={16} />
+                                </button>
+                                <button
+                                  onClick={() => handleReject(doc)}
+                                  disabled={isProcessing}
+                                  title="Reject"
+                                  style={{
+                                    padding: '6px',
+                                    backgroundColor: isProcessing ? '#9ca3af' : '#ef4444',
+                                    color: 'white',
+                                    border: 'none',
+                                    borderRadius: '4px',
+                                    cursor: isProcessing ? 'not-allowed' : 'pointer',
+                                    display: 'inline-flex',
+                                    alignItems: 'center',
+                                    justifyContent: 'center'
+                                  }}
+                                >
+                                  <FiX size={16} />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+                      );
+                    })
+                  )}
                 </tbody>
               </table>
             </div>

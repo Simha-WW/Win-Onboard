@@ -14,6 +14,7 @@ import { bgvRoutes } from './bgv.routes';
 import blobRoutes from './blob.routes';
 import itRoutes from './it.routes';
 import { birthdaysRoutes } from './birthdays.routes';
+import { documentsRoutes } from './documents.routes';
 
 const router = Router();
 
@@ -71,6 +72,13 @@ router.use('/it', itRoutes);
  * Mounted at: /api/birthdays/*
  */
 router.use('/birthdays', birthdaysRoutes);
+
+/**
+ * Documents Routes
+ * Employee documents submission endpoints (Employment, Passport, Bank details)
+ * Mounted at: /api/documents/*
+ */
+router.use('/documents', documentsRoutes);
 
 /**
  * TODO: Add additional route modules as they are implemented
