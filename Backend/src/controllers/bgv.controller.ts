@@ -139,13 +139,60 @@ export class BGVController {
         // Continue without education data if table doesn't exist yet
       }
 
+      // Load saved employment history
+      let savedEmployment = null;
+      try {
+        const fresherId = parseInt(userId.toString());
+        const { documentsService } = await import('../services/documents.service');
+        const employmentData = await documentsService.getEmploymentHistory(fresherId);
+        if (employmentData && employmentData.length > 0) {
+          savedEmployment = {
+            employmentHistory: employmentData
+          };
+          console.log('📋 Loaded employment data for fresher:', fresherId);
+        }
+      } catch (employmentError) {
+        console.error('⚠️ Error loading employment data:', employmentError);
+      }
+
+      // Load saved passport/visa data
+      let savedPassportVisa = null;
+      try {
+        const fresherId = parseInt(userId.toString());
+        const { documentsService } = await import('../services/documents.service');
+        const passportData = await documentsService.getPassportVisa(fresherId);
+        if (passportData) {
+          savedPassportVisa = passportData;
+          console.log('📋 Loaded passport/visa data for fresher:', fresherId);
+        }
+      } catch (passportError) {
+        console.error('⚠️ Error loading passport/visa data:', passportError);
+      }
+
+      // Load saved bank/pf/nps data
+      let savedBankPfNps = null;
+      try {
+        const fresherId = parseInt(userId.toString());
+        const { documentsService } = await import('../services/documents.service');
+        const bankData = await documentsService.getBankPfNps(fresherId);
+        if (bankData) {
+          savedBankPfNps = bankData;
+          console.log('📋 Loaded bank/pf/nps data for fresher:', fresherId);
+        }
+      } catch (bankError) {
+        console.error('⚠️ Error loading bank/pf/nps data:', bankError);
+      }
+
       res.json({
         success: true,
         submission,
         prefilledData,
         savedDemographics,
         savedPersonal,
-        savedEducation
+        savedEducation,
+        savedEmployment,
+        savedPassportVisa,
+        savedBankPfNps
       });
     } catch (error) {
       console.error('Error getting BGV submission:', error);
@@ -645,6 +692,9 @@ export class BGVController {
           demographics: bgvData.demographics,
           personal: bgvData.personal,
           education: bgvData.education,
+          employment: bgvData.employment,
+          passportVisa: bgvData.passportVisa,
+          bankPfNps: bgvData.bankPfNps,
           submission: bgvData.submission,
           verifications,
           grouped: groupedVerifications

@@ -1939,13 +1939,41 @@ export class BGVService {
           WHERE fresher_id = @fresherId
         `);
 
-      console.log(`✅ Found data - Demographics: ${demographicsResult.recordset.length}, Personal: ${personalResult.recordset.length}, Education: ${educationResult.recordset.length}`);
+      // Get employment history
+      const employmentResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT * FROM employment_history
+          WHERE fresher_id = @fresherId
+          ORDER BY id
+        `);
+
+      // Get passport & visa data
+      const passportResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT * FROM passport_visa
+          WHERE fresher_id = @fresherId
+        `);
+
+      // Get bank/pf/nps data
+      const bankResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT * FROM bank_pf_nps
+          WHERE fresher_id = @fresherId
+        `);
+
+      console.log(`✅ Found data - Demographics: ${demographicsResult.recordset.length}, Personal: ${personalResult.recordset.length}, Education: ${educationResult.recordset.length}, Employment: ${employmentResult.recordset.length}, Passport: ${passportResult.recordset.length}, Banking: ${bankResult.recordset.length}`);
 
       return {
         fresher: fresherInfo,
         demographics: demographicsResult.recordset[0] || null,
         personal: personalResult.recordset[0] || null,
         education: educationResult.recordset || [],
+        employment: employmentResult.recordset || [],
+        passportVisa: passportResult.recordset[0] || null,
+        bankPfNps: bankResult.recordset[0] || null,
         submission: submissionResult.recordset[0] || null
       };
     } catch (error) {
