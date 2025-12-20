@@ -39,7 +39,8 @@ router.post('/hr/upload-verification-document', uploadMemory.single('file'), bgv
 router.get('/submission-details/:fresherId', bgvController.getCompleteSubmissionData.bind(bgvController));
 
 // PDF Generation route (for testing and HR use)
-router.get('/pdf/:fresherId', bgvController.generateBGVPDF.bind(bgvController));
+// Note: generateBGVPDF method not available in current controller version
+// router.get('/pdf/:fresherId', bgvController.generateBGVPDF.bind(bgvController));
 
 // Document download route
 router.get('/documents/:documentId', bgvController.getDocument.bind(bgvController));

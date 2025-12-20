@@ -132,6 +132,162 @@ export class PDFGenerator {
     this.currentY += this.lineHeight * amount;
   }
 
+  private addTable(data: { [key: string]: any }, excludeFields: string[] = []) {
+    const tableStartY = this.currentY;
+    const columnPadding = 5;
+    const rowHeight = 8;
+    const col1Width = 80; // Property column width
+    const col2Width = this.pageWidth - 2 * this.margin - col1Width; // Value column width
+    
+    // Filter out null/undefined values and excluded fields
+    const entries = Object.entries(data).filter(
+      ([key, value]) => value !== null && value !== undefined && !excludeFields.includes(key)
+    );
+    
+    if (entries.length === 0) return;
+    
+    // Draw table headers
+    this.checkPageBreak(30);
+    const tableX = this.margin;
+    
+    // Header background
+    this.doc.setFillColor(240, 240, 240);
+    this.doc.rect(tableX, this.currentY - 5, col1Width + col2Width, rowHeight, 'F');
+    
+    // Header text
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text('Property', tableX + columnPadding, this.currentY);
+    this.doc.text('Value', tableX + col1Width + columnPadding, this.currentY);
+    
+    // Header border
+    this.doc.setDrawColor(200, 200, 200);
+    this.doc.rect(tableX, this.currentY - 5, col1Width + col2Width, rowHeight);
+    this.doc.line(tableX + col1Width, this.currentY - 5, tableX + col1Width, this.currentY + rowHeight - 5);
+    
+    this.currentY += rowHeight - 2;
+    
+    // Draw table rows
+    entries.forEach(([key, value]) => {
+      this.checkPageBreak(rowHeight + 5);
+      
+      // Format the key (convert snake_case to Title Case)
+      const formattedKey = key
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      // Format the value
+      let formattedValue = String(value);
+      if (value instanceof Date || (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/))) {
+        try {
+          formattedValue = new Date(value).toLocaleDateString();
+        } catch (e) {
+          // Keep original if date parsing fails
+        }
+      }
+      
+      // Property cell
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setFontSize(9);
+      this.doc.text(formattedKey, tableX + columnPadding, this.currentY);
+      
+      // Value cell - handle long text with wrapping
+      this.doc.setFont('helvetica', 'normal');
+      const maxValueWidth = col2Width - 2 * columnPadding;
+      const lines = this.doc.splitTextToSize(formattedValue, maxValueWidth);
+      const cellHeight = Math.max(rowHeight, lines.length * 5 + 3);
+      
+      lines.forEach((line: string, idx: number) => {
+        this.doc.text(line, tableX + col1Width + columnPadding, this.currentY + (idx * 5));
+      });
+      
+      // Row borders
+      this.doc.setDrawColor(200, 200, 200);
+      this.doc.rect(tableX, this.currentY - 5, col1Width + col2Width, cellHeight);
+      this.doc.line(tableX + col1Width, this.currentY - 5, tableX + col1Width, this.currentY + cellHeight - 5);
+      
+      this.currentY += cellHeight - 2;
+    });
+    
+    this.addSpace(1);
+  }
+
+  private addTableWithLinks(data: { [key: string]: any }, linkFields: { [key: string]: string } = {}) {
+    const tableStartY = this.currentY;
+    const columnPadding = 5;
+    const rowHeight = 8;
+    const col1Width = 80;
+    const col2Width = this.pageWidth - 2 * this.margin - col1Width;
+    
+    const entries = Object.entries(data).filter(
+      ([key, value]) => value !== null && value !== undefined
+    );
+    
+    if (entries.length === 0) return;
+    
+    // Draw table headers
+    this.checkPageBreak(30);
+    const tableX = this.margin;
+    
+    this.doc.setFillColor(240, 240, 240);
+    this.doc.rect(tableX, this.currentY - 5, col1Width + col2Width, rowHeight, 'F');
+    
+    this.doc.setFontSize(10);
+    this.doc.setFont('helvetica', 'bold');
+    this.doc.text('Property', tableX + columnPadding, this.currentY);
+    this.doc.text('Value', tableX + col1Width + columnPadding, this.currentY);
+    
+    this.doc.setDrawColor(200, 200, 200);
+    this.doc.rect(tableX, this.currentY - 5, col1Width + col2Width, rowHeight);
+    this.doc.line(tableX + col1Width, this.currentY - 5, tableX + col1Width, this.currentY + rowHeight - 5);
+    
+    this.currentY += rowHeight - 2;
+    
+    entries.forEach(([key, value]) => {
+      this.checkPageBreak(rowHeight + 5);
+      
+      const formattedKey = key
+        .split('_')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+      
+      this.doc.setFont('helvetica', 'bold');
+      this.doc.setFontSize(9);
+      this.doc.text(formattedKey, tableX + columnPadding, this.currentY);
+      
+      this.doc.setFont('helvetica', 'normal');
+      
+      // Check if this is a link field
+      if (linkFields[key] && typeof value === 'string' && value.startsWith('http')) {
+        this.doc.setTextColor(0, 0, 255);
+        this.doc.textWithLink('View Document', tableX + col1Width + columnPadding, this.currentY, { url: value });
+        this.doc.setTextColor(0, 0, 0);
+      } else {
+        let formattedValue = String(value);
+        if (value instanceof Date || (typeof value === 'string' && value.match(/^\d{4}-\d{2}-\d{2}/))) {
+          try {
+            formattedValue = new Date(value).toLocaleDateString();
+          } catch (e) {}
+        }
+        
+        const maxValueWidth = col2Width - 2 * columnPadding;
+        const lines = this.doc.splitTextToSize(formattedValue, maxValueWidth);
+        lines.forEach((line: string, idx: number) => {
+          this.doc.text(line, tableX + col1Width + columnPadding, this.currentY + (idx * 5));
+        });
+      }
+      
+      this.doc.setDrawColor(200, 200, 200);
+      this.doc.rect(tableX, this.currentY - 5, col1Width + col2Width, rowHeight);
+      this.doc.line(tableX + col1Width, this.currentY - 5, tableX + col1Width, this.currentY + rowHeight - 5);
+      
+      this.currentY += rowHeight - 2;
+    });
+    
+    this.addSpace(1);
+  }
+
   private async addImage(imageUrl: string, label: string) {
     try {
       this.checkPageBreak(60);
@@ -199,189 +355,208 @@ export class PDFGenerator {
     
     // Candidate Information
     this.addSectionTitle('Candidate Information');
-    this.addField('Name', `${data.fresher.first_name} ${data.fresher.last_name}`);
-    this.addField('Email', data.fresher.email);
-    this.addField('Designation', data.fresher.designation);
-    this.addField('Department', data.fresher.department);
-    this.addField('Joining Date', data.fresher.joining_date ? new Date(data.fresher.joining_date).toLocaleDateString() : 'N/A');
-    this.addField('Submitted At', data.submittedAt ? new Date(data.submittedAt).toLocaleString() : 'N/A');
-    this.addSpace(2);
+    const candidateInfo = {
+      name: `${data.fresher.first_name} ${data.fresher.last_name}`,
+      email: data.fresher.email,
+      designation: data.fresher.designation || 'N/A',
+      department: data.fresher.department || 'N/A',
+      joining_date: data.fresher.joining_date ? new Date(data.fresher.joining_date).toLocaleDateString() : 'N/A',
+      submitted_at: data.submittedAt ? new Date(data.submittedAt).toLocaleString() : 'N/A'
+    };
+    this.addTable(candidateInfo);
+    this.addSpace(1);
 
     // Demographics
     if (data.demographics) {
       this.addSectionTitle('Demographics');
-      this.addField('Salutation', data.demographics.salutation);
-      this.addField('First Name', data.demographics.first_name);
-      this.addField('Middle Name', data.demographics.middle_name);
-      this.addField('Last Name', data.demographics.last_name);
-      this.addField('Gender', data.demographics.gender);
-      this.addField('Blood Group', data.demographics.blood_group);
-      this.addField('Date of Birth', data.demographics.dob_as_per_records);
-      this.addField('Aadhaar Number', data.demographics.aadhaar_card_number);
-      this.addLinkField('Aadhaar Doc File Url', data.demographics.aadhaar_doc_file_url);
-      this.addField('PAN Number', data.demographics.pan_card_number);
-      this.addLinkField('Pan File Url', data.demographics.pan_file_url);
-      this.addLinkField('Resume File Url', data.demographics.resume_file_url);
-      this.addField('WhatsApp Number', data.demographics.whatsapp_number);
-      this.addField('LinkedIn URL', data.demographics.linkedin_url);
+      
+      const demographicsInfo = {
+        salutation: data.demographics.salutation,
+        first_name: data.demographics.first_name,
+        middle_name: data.demographics.middle_name,
+        last_name: data.demographics.last_name,
+        gender: data.demographics.gender,
+        blood_group: data.demographics.blood_group,
+        date_of_birth: data.demographics.dob_as_per_records,
+        aadhaar_number: data.demographics.aadhaar_card_number,
+        pan_number: data.demographics.pan_card_number,
+        whatsapp_number: data.demographics.whatsapp_number,
+        linkedin_url: data.demographics.linkedin_url
+      };
+      
+      const linkFields = {
+        aadhaar_doc_file_url: data.demographics.aadhaar_doc_file_url,
+        pan_file_url: data.demographics.pan_file_url,
+        resume_file_url: data.demographics.resume_file_url
+      };
+      
+      // Add demographic info without document URLs
+      this.addTable(demographicsInfo);
+      
+      // Add document links if they exist
+      if (data.demographics.aadhaar_doc_file_url || data.demographics.pan_file_url || data.demographics.resume_file_url) {
+        this.addSectionTitle('Documents');
+        const docLinks: any = {};
+        if (data.demographics.aadhaar_doc_file_url) docLinks.aadhaar_document = data.demographics.aadhaar_doc_file_url;
+        if (data.demographics.pan_file_url) docLinks.pan_document = data.demographics.pan_file_url;
+        if (data.demographics.resume_file_url) docLinks.resume = data.demographics.resume_file_url;
+        this.addTableWithLinks(docLinks, docLinks);
+      }
       
       // Communication Address
       if (data.demographics.comm_city || data.demographics.comm_state) {
-        this.addSpace();
-        this.doc.setFontSize(10);
-        this.doc.setFont('helvetica', 'bold');
-        this.doc.text('Communication Address:', this.margin, this.currentY);
-        this.currentY += this.lineHeight;
-        this.doc.setFont('helvetica', 'normal');
-        
-        const commAddress = [
-          data.demographics.comm_house_number,
-          data.demographics.comm_street_name,
-          data.demographics.comm_city,
-          data.demographics.comm_district,
-          data.demographics.comm_state,
-          data.demographics.comm_country,
-          data.demographics.comm_pin_code
-        ].filter(Boolean).join(', ');
-        
-        this.doc.text(commAddress || 'N/A', this.margin + 10, this.currentY);
-        this.currentY += this.lineHeight;
+        this.addSectionTitle('Communication Address');
+        const commAddress = {
+          house_number: data.demographics.comm_house_number,
+          street_name: data.demographics.comm_street_name,
+          city: data.demographics.comm_city,
+          district: data.demographics.comm_district,
+          state: data.demographics.comm_state,
+          country: data.demographics.comm_country,
+          pin_code: data.demographics.comm_pin_code
+        };
+        this.addTable(commAddress);
       }
       
       // Permanent Address
       if (data.demographics.perm_city || data.demographics.perm_state) {
-        this.addSpace();
-        this.doc.setFontSize(10);
-        this.doc.setFont('helvetica', 'bold');
-        this.doc.text('Permanent Address:', this.margin, this.currentY);
-        this.currentY += this.lineHeight;
-        this.doc.setFont('helvetica', 'normal');
-        
-        const permAddress = [
-          data.demographics.perm_house_number,
-          data.demographics.perm_street_name,
-          data.demographics.perm_city,
-          data.demographics.perm_district,
-          data.demographics.perm_state,
-          data.demographics.perm_country,
-          data.demographics.perm_pin_code
-        ].filter(Boolean).join(', ');
-        
-        this.doc.text(permAddress || 'N/A', this.margin + 10, this.currentY);
-        this.currentY += this.lineHeight;
+        this.addSectionTitle('Permanent Address');
+        const permAddress = {
+          house_number: data.demographics.perm_house_number,
+          street_name: data.demographics.perm_street_name,
+          city: data.demographics.perm_city,
+          district: data.demographics.perm_district,
+          state: data.demographics.perm_state,
+          country: data.demographics.perm_country,
+          pin_code: data.demographics.perm_pin_code
+        };
+        this.addTable(permAddress);
       }
       
-      this.addSpace(2);
+      this.addSpace(1);
     }
 
     // Personal Information
     if (data.personal) {
       this.addSectionTitle('Personal Information');
-      this.addField('Marital Status', data.personal.marital_status);
-      this.addField('Number of Children', data.personal.num_children);
-      this.addField('Father Name', data.personal.father_name);
-      this.addField('Father DOB', data.personal.father_dob);
-      this.addField('Mother Name', data.personal.mother_name);
-      this.addField('Mother DOB', data.personal.mother_dob);
-      this.addSpace(2);
+      const personalInfo = {
+        marital_status: data.personal.marital_status,
+        number_of_children: data.personal.num_children,
+        father_name: data.personal.father_name,
+        father_date_of_birth: data.personal.father_dob,
+        mother_name: data.personal.mother_name,
+        mother_date_of_birth: data.personal.mother_dob
+      };
+      this.addTable(personalInfo);
+      this.addSpace(1);
     }
 
     // Emergency Contacts
     if (data.emergencyContacts && data.emergencyContacts.length > 0) {
       this.addSectionTitle('Emergency Contacts');
       data.emergencyContacts.forEach((contact, index) => {
-        this.addField(`Contact ${index + 1} - Name`, contact.name);
-        this.addField(`Contact ${index + 1} - Relationship`, contact.relationship);
-        this.addField(`Contact ${index + 1} - Phone`, contact.phone);
-        this.addSpace();
+        this.doc.setFontSize(10);
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.text(`Contact ${index + 1}`, this.margin, this.currentY);
+        this.currentY += this.lineHeight;
+        
+        const contactInfo = {
+          name: contact.name,
+          relationship: contact.relationship,
+          phone: contact.phone
+        };
+        this.addTable(contactInfo);
       });
-      this.addSpace();
+      this.addSpace(1);
     }
 
     // Education
     if (data.education && data.education.length > 0) {
       this.addSectionTitle('Educational Details');
       data.education.forEach((edu, index) => {
-        this.addField(`${index + 1}. Qualification Type`, edu.qualification_type);
-        this.addField('   Qualification', edu.qualification);
-        this.addField('   University/Institution', edu.university_institution);
-        this.addField('   CGPA/Percentage', edu.cgpa_percentage);
-        this.addField('   Year of Passing', edu.year_of_passing);
+        this.doc.setFontSize(10);
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.text(`Education ${index + 1}`, this.margin, this.currentY);
+        this.currentY += this.lineHeight;
         
-        // Add document URL if available
+        const eduInfo = {
+          qualification_type: edu.qualification_type,
+          qualification: edu.qualification,
+          university_institution: edu.university_institution,
+          cgpa_percentage: edu.cgpa_percentage,
+          year_of_passing: edu.year_of_passing
+        };
+        this.addTable(eduInfo);
+        
+        // Add document URLs if available
+        const eduDocs: any = {};
         if (edu.document_url) {
-          this.checkPageBreak();
-          this.doc.setFontSize(10);
-          this.doc.setFont('helvetica', 'bold');
-          this.doc.text('   Certificate:', this.margin, this.currentY);
-          
-          this.doc.setFont('helvetica', 'normal');
-          this.doc.setTextColor(0, 0, 255);
-          const labelWidth = this.doc.getTextWidth('   Certificate: ');
-          this.doc.textWithLink('View Certificate', this.margin + labelWidth, this.currentY, { url: edu.document_url });
-          this.doc.setTextColor(0, 0, 0);
-          this.currentY += this.lineHeight;
+          eduDocs.certificate = edu.document_url;
         }
         
-        // Handle documents array if it exists
         if (edu.documents && Array.isArray(edu.documents) && edu.documents.length > 0) {
           edu.documents.forEach((doc: any, docIdx: number) => {
             if (doc.fileUrl) {
-              this.checkPageBreak();
-              this.doc.setFontSize(10);
-              this.doc.setFont('helvetica', 'bold');
-              this.doc.text(`   Document ${docIdx + 1}:`, this.margin, this.currentY);
-              
-              this.doc.setFont('helvetica', 'normal');
-              this.doc.setTextColor(0, 0, 255);
-              const labelWidth = this.doc.getTextWidth(`   Document ${docIdx + 1}: `);
-              this.doc.textWithLink('View Document', this.margin + labelWidth, this.currentY, { url: doc.fileUrl });
-              this.doc.setTextColor(0, 0, 0);
-              this.currentY += this.lineHeight;
+              eduDocs[`document_${docIdx + 1}`] = doc.fileUrl;
             }
           });
         }
         
-        this.addSpace();
+        if (Object.keys(eduDocs).length > 0) {
+          this.addTableWithLinks(eduDocs, eduDocs);
+        }
       });
-      this.addSpace();
+      this.addSpace(1);
     }
 
     // Employment History
     if (data.employment && data.employment.length > 0) {
       this.addSectionTitle('Employment History');
       data.employment.forEach((emp, index) => {
-        this.addField(`${index + 1}. Company Name`, emp.company_name);
-        this.addField('   Designation', emp.designation);
-        this.addField('   Start Date', emp.start_date);
-        this.addField('   End Date', emp.end_date);
-        this.addField('   Reason for Leaving', emp.reason_for_leaving);
-        this.addSpace();
+        this.doc.setFontSize(10);
+        this.doc.setFont('helvetica', 'bold');
+        this.doc.text(`Employment ${index + 1}`, this.margin, this.currentY);
+        this.currentY += this.lineHeight;
+        
+        const empInfo = {
+          company_name: emp.company_name,
+          designation: emp.designation,
+          start_date: emp.start_date,
+          end_date: emp.end_date,
+          reason_for_leaving: emp.reason_for_leaving
+        };
+        this.addTable(empInfo);
       });
-      this.addSpace();
+      this.addSpace(1);
     }
 
     // Passport & Visa
     if (data.passportVisa) {
       this.addSectionTitle('Passport & Visa Details');
-      this.addField('Passport Number', data.passportVisa.passport_number);
-      this.addField('Issue Date', data.passportVisa.issue_date);
-      this.addField('Expiry Date', data.passportVisa.expiry_date);
-      this.addField('Place of Issue', data.passportVisa.place_of_issue);
-      this.addSpace(2);
+      const passportInfo = {
+        passport_number: data.passportVisa.passport_number,
+        issue_date: data.passportVisa.issue_date,
+        expiry_date: data.passportVisa.expiry_date,
+        place_of_issue: data.passportVisa.place_of_issue
+      };
+      this.addTable(passportInfo);
+      this.addSpace(1);
     }
 
     // Bank, PF, NPS Details
     if (data.bankPfNps) {
       this.addSectionTitle('Bank, PF & NPS Details');
-      this.addField('Bank Name', data.bankPfNps.bank_name);
-      this.addField('Account Number', data.bankPfNps.account_number);
-      this.addField('IFSC Code', data.bankPfNps.ifsc_code);
-      this.addField('Branch Name', data.bankPfNps.branch_name);
-      this.addField('PF Number', data.bankPfNps.pf_number);
-      this.addField('UAN Number', data.bankPfNps.uan_number);
-      this.addField('NPS Number', data.bankPfNps.nps_number);
-      this.addSpace(2);
+      const bankInfo = {
+        bank_name: data.bankPfNps.bank_name,
+        account_number: data.bankPfNps.account_number,
+        ifsc_code: data.bankPfNps.ifsc_code,
+        branch_name: data.bankPfNps.branch_name,
+        pf_number: data.bankPfNps.pf_number,
+        uan_number: data.bankPfNps.uan_number,
+        nps_number: data.bankPfNps.nps_number
+      };
+      this.addTable(bankInfo);
+      this.addSpace(1);
     }
 
     // Signature
