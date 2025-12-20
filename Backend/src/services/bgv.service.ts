@@ -2432,6 +2432,65 @@ export class BGVService {
   }
 
   /**
+   * Get complete submission data including signature for PDF generation
+   */
+  static async getCompleteSubmissionData(fresherId: number) {
+    try {
+      const pool = getMSSQLPool();
+      
+      // Verify fresher exists and get basic info
+      const fresherResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('SELECT id, first_name, last_name, email, designation, department, joining_date FROM dbo.freshers WHERE id = @fresherId');
+      
+      if (!fresherResult.recordset || fresherResult.recordset.length === 0) {
+        throw new Error('Fresher not found');
+      }
+
+      const fresher = fresherResult.recordset[0];
+
+      // Fetch all data using dbo schema prefix
+      const [demographics, personal, employment, education, passportVisa, bankPfNps, submission] = await Promise.all([
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM dbo.bgv_demographics WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM dbo.bgv_personal WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM dbo.employment_history WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM dbo.educational_details WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM dbo.passport_visa WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM dbo.bank_pf_nps WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT signature_url, submitted_at FROM dbo.bgv_submissions WHERE fresher_id = @id')
+      ]);
+
+      // Parse emergency_contacts from bgv_personal (stored as JSON)
+      let emergencyContacts = [];
+      if (personal.recordset?.[0]?.emergency_contacts) {
+        try {
+          emergencyContacts = typeof personal.recordset[0].emergency_contacts === 'string' 
+            ? JSON.parse(personal.recordset[0].emergency_contacts)
+            : personal.recordset[0].emergency_contacts;
+        } catch (e) {
+          console.error('Error parsing emergency_contacts:', e);
+        }
+      }
+
+      return {
+        fresher,
+        demographics: demographics.recordset?.[0] || null,
+        personal: personal.recordset?.[0] || null,
+        employment: employment.recordset || [],
+        education: education.recordset || [],
+        passportVisa: passportVisa.recordset?.[0] || null,
+        bankPfNps: bankPfNps.recordset?.[0] || null,
+        emergencyContacts: emergencyContacts,
+        signatureUrl: submission.recordset?.[0]?.signature_url || null,
+        submittedAt: submission.recordset?.[0]?.submitted_at || null
+      };
+    } catch (error) {
+      console.error('Error fetching complete submission data:', error);
+      throw error;
+    }
+  }
+
+  /**
    * Final submit BGV form with signature
    */
   static async finalSubmit(fresherId: number, signature: string, submittedAt: string) {

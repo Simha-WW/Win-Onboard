@@ -1,4 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
+import { FiUsers } from 'react-icons/fi';
 import { API_BASE_URL } from '../../config';
 
 interface BirthdayRecord {
@@ -225,6 +226,52 @@ export const HrBirthdays = () => {
         <div style={tableStyles.headerText}>
           <h2 style={tableStyles.title}>🎂 Employee Birthdays</h2>
           <p style={tableStyles.subtitle}>{currentMonth} — Celebrate your team members!</p>
+        </div>
+
+        {/* KPI Card */}
+        <div style={{
+          backgroundColor: '#f0fdf4',
+          borderRadius: '12px',
+          padding: '20px',
+          border: '1px solid #10b98120',
+          boxShadow: '0 2px 8px rgba(0, 0, 0, 0.08)',
+          position: 'relative',
+          width: '180px',
+          flexShrink: 0
+        }}>
+          <div style={{ 
+            position: 'absolute', 
+            top: '18px', 
+            right: '18px',
+            width: '40px',
+            height: '40px',
+            borderRadius: '50%',
+            backgroundColor: 'rgba(255, 255, 255, 0.7)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center'
+          }}>
+            <FiUsers style={{ width: '20px', height: '20px', color: '#10b981' }} />
+          </div>
+          <div style={{ 
+            fontSize: '11px', 
+            color: '#6b7280', 
+            fontWeight: '600', 
+            textTransform: 'uppercase', 
+            letterSpacing: '0.5px',
+            marginBottom: '10px'
+          }}>
+            Total Birthdays
+          </div>
+          <div style={{ 
+            fontSize: '36px', 
+            fontWeight: '700', 
+            color: '#10b981', 
+            lineHeight: '1',
+            marginBottom: '4px'
+          }}>
+            {data.length}
+          </div>
         </div>
 
         <div style={tableStyles.buttonGroup}>

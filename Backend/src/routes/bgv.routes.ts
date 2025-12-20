@@ -36,6 +36,7 @@ router.post('/hr/verify', bgvController.saveVerification.bind(bgvController));
 router.post('/hr/send-email', bgvController.sendVerificationEmail.bind(bgvController));
 router.post('/hr/document/:documentId/verify', bgvController.verifyDocument.bind(bgvController));
 router.post('/hr/upload-verification-document', uploadMemory.single('file'), bgvController.uploadHRVerificationDocument.bind(bgvController));
+router.get('/submission-details/:fresherId', bgvController.getCompleteSubmissionData.bind(bgvController));
 
 // Document download route
 router.get('/documents/:documentId', bgvController.getDocument.bind(bgvController));

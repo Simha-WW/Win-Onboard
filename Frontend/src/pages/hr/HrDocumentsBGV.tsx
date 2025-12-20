@@ -14,10 +14,12 @@ import {
   FiUser,
   FiCalendar,
   FiBriefcase,
-  FiCpu
+  FiCpu,
+  FiDownload
 } from 'react-icons/fi';
 import { API_BASE_URL } from '../../config';
 import { hrApiService } from '../../services/hrApi';
+import { generateSubmissionPDF } from '../../utils/pdfGenerator';
 
 interface BGVSubmission {
   submission_id: number;
@@ -215,6 +217,38 @@ export const HrDocumentsBGV = () => {
 
   const handleViewSubmission = (fresherId: number) => {
     navigate(`/hr/documents/${fresherId}`);
+  };
+
+  const handleDownloadPdf = async (fresherId: number) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const response = await fetch(`${API_BASE_URL}/bgv/submission-details/${fresherId}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch submission data');
+      }
+
+      const result = await response.json();
+      if (!result.success || !result.data) {
+        throw new Error('Invalid submission data');
+      }
+
+      const submissionData = result.data;
+      const candidateName = `${submissionData.fresher.first_name} ${submissionData.fresher.last_name}`;
+      
+      // Generate and download PDF
+      await generateSubmissionPDF(submissionData, candidateName);
+      
+      alert('PDF downloaded successfully!');
+    } catch (error: any) {
+      alert(error.message || 'Failed to download PDF');
+      console.error('Error downloading PDF:', error);
+    }
   };
 
   const handleSendToIT = async (fresherId: number, e: React.MouseEvent) => {
@@ -585,7 +619,7 @@ export const HrDocumentsBGV = () => {
 
                 {/* Action Buttons */}
                 <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
-                  {/* View Documents Button */}
+                  {/* Download PDF Button */}
                   <button
                     style={{
                       width: '90px',
@@ -608,71 +642,13 @@ export const HrDocumentsBGV = () => {
                     onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleViewSubmission(submission.fresher_id);
+                      handleDownloadPdf(submission.fresher_id);
                     }}
+                    title="Download submission as PDF"
                   >
-                    View
-                    <FiArrowRight size={12} />
+                    <FiDownload size={12} />
+                    Download
                   </button>
-
-                  {/* Send to IT button - only show if all documents verified and not sent yet */}
-                  {submission.verified_count === submission.total_verifications && 
-                   submission.total_verifications > 0 && 
-                   submission.rejected_count === 0 && 
-                   submission.vendor_verified === 0 &&
-                   submission.vendor_rejected === 0 && (
-                    submission.sent_to_it === 1 ? (
-                      <div
-                        style={{
-                          width: '90px',
-                          padding: '7px 10px',
-                          backgroundColor: '#6b7280',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '5px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          opacity: 0.8,
-                          whiteSpace: 'nowrap'
-                        }}
-                        title="Already sent to IT and Vendor"
-                      >
-                        Sent
-                        <FiCheckCircle size={12} />
-                      </div>
-                    ) : (
-                      <button
-                        style={{
-                          width: '90px',
-                          padding: '7px 10px',
-                          backgroundColor: '#10b981',
-                          color: 'white',
-                          border: 'none',
-                          borderRadius: '5px',
-                          fontSize: '12px',
-                          fontWeight: '600',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          gap: '4px',
-                          transition: 'background-color 0.2s',
-                          whiteSpace: 'nowrap'
-                        }}
-                        onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
-                        onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
-                        onClick={(e) => handleSendToIT(submission.fresher_id, e)}
-                        title="Send to IT and Vendor"
-                      >
-                        Send
-                        <FiCpu size={12} />
-                      </button>
-                    )
-                  )}
 
                   {/* Vendor Verification Buttons - only show if sent to IT and vendor, and not yet verified/rejected */}
                   {submission.sent_to_it === 1 && 
