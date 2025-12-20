@@ -1,282 +1,172 @@
-import axios, { AxiosResponse } from 'axios';
+import { AIProjectsClient } from '@azure/ai-projects';
+import { AzureKeyCredential } from '@azure/core-auth';
 
 /**
  * AI Agent Service
- * Handles communication with Azure AI Foundry agent using the thread-based pattern
+ * Handles communication with Azure AI Foundry Agent with custom knowledge base
  * 
- * Pattern:
- * 1. Create or get thread
- * 2. Add user message to thread
- * 3. Run agent on thread
- * 4. Retrieve messages
- * 
- * DEMO MODE: If API key is invalid, runs in demo mode with simulated responses
+ * Uses Azure AI Projects SDK to connect to your configured agent
+ * The agent has access to custom knowledge/data sources you configured in Azure AI Foundry
  */
 export class AIAgentService {
-  private endpoint: string;
-  private apiKey: string;
-  private agentId: string = 'asst_LfrmJixgihcM4gRdBqqEkvY0';
+  private client: AIProjectsClient | null = null;
+  private agentId: string;
   private demoMode: boolean = false;
+  private projectEndpoint: string;
+  private apiKey: string;
 
   constructor() {
-    this.endpoint = process.env.AZURE_FOUNDRY_PROJECT_ENDPOINT || '';
-    this.apiKey = process.env.AZURE_FOUNDRY_API_KEY || '';
+    this.projectEndpoint = process.env.AZURE_FOUNDRY_PROJECT_ENDPOINT || '';
+    this.apiKey = process.env.AZURE_FOUNDRY_API_KEY || process.env.AZURE_OPENAI_API_KEY || '';
+    this.agentId = process.env.AZURE_FOUNDRY_AGENT_ID || 'asst_LfrmJixgihcM4gRdBqqEkvY0';
 
-    if (!this.endpoint) {
-      console.warn('⚠️ AZURE_FOUNDRY_PROJECT_ENDPOINT not configured');
-    }
-    if (!this.apiKey) {
-      console.warn('⚠️ AZURE_FOUNDRY_API_KEY not configured');
+    if (!this.projectEndpoint || !this.apiKey) {
+      console.warn('⚠️ Azure AI Foundry not configured - using DEMO MODE');
       this.demoMode = true;
-    }
-    
-    // Enable demo mode for development (dummy/invalid keys)
-    if (this.apiKey && (this.apiKey.length < 50 || this.apiKey.toLowerCase().includes('dummy') || this.apiKey.toLowerCase().includes('demo') || this.apiKey.toLowerCase().includes('test') || this.apiKey.toLowerCase().includes('placeholder'))) {
+    } else if (this.apiKey.length < 50 || this.apiKey.toLowerCase().includes('dummy') || this.apiKey.toLowerCase().includes('demo') || this.apiKey.toLowerCase().includes('test') || this.apiKey.toLowerCase().includes('placeholder')) {
       console.warn('⚠️ Using DEMO MODE - API key appears to be a placeholder');
       this.demoMode = true;
-    }
-  }
-
-  /**
-   * Get headers with authentication
-   */
-  private getHeaders(): Record<string, string> {
-    return {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${this.apiKey}`
-    };
-  }
-
-  /**
-   * Create a new thread for conversation
-   */
-  async createThread(): Promise<string> {
-    if (this.demoMode) {
-      const threadId = `thread_demo_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-      console.log(`[DEMO] Created thread: ${threadId}`);
-      return threadId;
-    }
-
-    try {
-      const url = `${this.endpoint}/threads`;
-      console.log(`Creating thread at: ${url}`);
-      
-      const resp = await axios.post(
-        url,
-        {},
-        { headers: this.getHeaders(), timeout: 30000 }
-      );
-      
-      console.log('Thread created:', resp.data);
-      return resp.data?.id || resp.data?.thread_id;
-    } catch (err: any) {
-      console.error('Error creating thread:', {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data
-      });
-      throw err;
-    }
-  }
-
-  /**
-   * Add a message to a thread
-   */
-  async addMessage(threadId: string, content: string): Promise<void> {
-    if (this.demoMode) {
-      console.log(`[DEMO] Added message to ${threadId}: ${content}`);
-      return;
-    }
-
-    try {
-      const url = `${this.endpoint}/threads/${threadId}/messages`;
-      console.log(`Adding message to thread: ${threadId}`);
-      
-      const resp = await axios.post(
-        url,
-        {
-          role: 'user',
-          content: content
-        },
-        { headers: this.getHeaders(), timeout: 30000 }
-      );
-      
-      console.log('Message added:', resp.data);
-    } catch (err: any) {
-      console.error('Error adding message:', {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data
-      });
-      throw err;
-    }
-  }
-
-  /**
-   * Run the agent on a thread
-   */
-  async runAgent(threadId: string): Promise<string> {
-    if (this.demoMode) {
-      const runId = `run_demo_${Date.now()}`;
-      console.log(`[DEMO] Running agent on thread: ${threadId}`);
-      return runId;
-    }
-
-    try {
-      const url = `${this.endpoint}/threads/${threadId}/runs`;
-      console.log(`Running agent on thread: ${threadId}`);
-      
-      const resp = await axios.post(
-        url,
-        {
-          assistant_id: this.agentId
-        },
-        { headers: this.getHeaders(), timeout: 60000 }
-      );
-      
-      console.log('Agent run created:', resp.data);
-      const runId = resp.data?.id || resp.data?.run_id;
-      
-      // Wait for run to complete
-      await this.waitForRun(threadId, runId);
-      
-      return runId;
-    } catch (err: any) {
-      console.error('Error running agent:', {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data
-      });
-      throw err;
-    }
-  }
-
-  /**
-   * Wait for agent run to complete
-   */
-  async waitForRun(threadId: string, runId: string, maxAttempts: number = 10): Promise<void> {
-    for (let i = 0; i < maxAttempts; i++) {
+    } else {
       try {
-        const url = `${this.endpoint}/threads/${threadId}/runs/${runId}`;
-        const resp = await axios.get(url, { headers: this.getHeaders(), timeout: 30000 });
+        // Initialize Azure AI Projects client with API key authentication
+        const credential = new AzureKeyCredential(this.apiKey);
+        this.client = new AIProjectsClient(this.projectEndpoint, credential);
         
-        const status = resp.data?.status;
-        console.log(`Run status: ${status}`);
-        
-        if (status === 'completed' || status === 'success') {
-          return;
-        }
-        
-        if (status === 'failed' || status === 'error') {
-          throw new Error(`Run failed with status: ${status}`);
-        }
-        
-        // Wait before retrying
-        await new Promise(resolve => setTimeout(resolve, 1000));
-      } catch (err: any) {
-        console.error(`Error checking run status (attempt ${i + 1}):`, err.message);
-        if (i === maxAttempts - 1) throw err;
+        console.log('✅ Azure AI Foundry Agent configured:', {
+          endpoint: this.projectEndpoint,
+          agentId: this.agentId,
+          hasKnowledgeBase: true
+        });
+      } catch (error: any) {
+        console.error('❌ Failed to initialize Azure AI Projects client:', error.message);
+        this.demoMode = true;
       }
     }
   }
 
   /**
-   * Get messages from a thread
-   */
-  async getMessages(threadId: string): Promise<any[]> {
-    if (this.demoMode) {
-      console.log(`[DEMO] Fetching messages from thread: ${threadId}`);
-      // Return a demo response
-      return [
-        {
-          id: 'msg_demo_1',
-          role: 'user',
-          content: 'User message',
-          created_at: new Date().toISOString()
-        },
-        {
-          id: 'msg_demo_2',
-          role: 'assistant',
-          content: 'This is a demo response from the AI agent. In production, this would be connected to your Azure AI Foundry agent.',
-          created_at: new Date().toISOString()
-        }
-      ];
-    }
-
-    try {
-      const url = `${this.endpoint}/threads/${threadId}/messages`;
-      console.log(`Fetching messages from thread: ${threadId}`);
-      
-      const resp = await axios.get(
-        url,
-        { headers: this.getHeaders(), timeout: 30000 }
-      );
-      
-      console.log('Messages fetched:', resp.data);
-      return resp.data?.data || resp.data?.messages || [];
-    } catch (err: any) {
-      console.error('Error getting messages:', {
-        message: err.message,
-        status: err.response?.status,
-        data: err.response?.data
-      });
-      throw err;
-    }
-  }
-
-  /**
-   * Process user message: create thread, add message, run agent, get response
+   * Process user message using Azure AI Foundry Agent with knowledge base
    */
   async processMessage(userMessage: string, threadId?: string): Promise<string> {
     try {
-      // Create new thread if not provided
+      console.log(`[AI Agent] Processing message: "${userMessage.substring(0, 50)}..."`);
+
+      // Demo mode response
+      if (this.demoMode || !this.client) {
+        const demoResponses = [
+          "Hello! I'm your WinOnboard AI assistant with access to company knowledge. I can help you with onboarding questions, document requirements, and HR policies. How can I assist you today?",
+          "Based on the company documentation, you'll typically need to submit educational certificates, previous employment records, and identity proof for onboarding. Would you like more specific information?",
+          "I can help you with your onboarding journey. I have access to all company policies and procedures. What would you like to know?",
+          "The onboarding process includes document verification, background checks, and completing personal information forms. I can guide you through each step based on our company's specific requirements."
+        ];
+        const response = demoResponses[Math.floor(Math.random() * demoResponses.length)];
+        console.log(`[DEMO] Generated response`);
+        return response;
+      }
+
+      // Create or get thread
       if (!threadId) {
-        threadId = await this.createThread();
-        console.log(`Created new thread: ${threadId}`);
+        console.log('[AI Agent] Creating new thread...');
+        const thread = await this.client.agents.createThread();
+        threadId = thread.id;
+        console.log(`[AI Agent] Created thread: ${threadId}`);
       }
 
-      // Add user message
-      await this.addMessage(threadId, userMessage);
-
-      // Run agent
-      const runId = await this.runAgent(threadId);
-      console.log(`Started run ${runId}`);
-
-      // Get messages
-      const messages = await this.getMessages(threadId);
-      console.log(`Retrieved ${messages.length} messages`);
-
-      // Extract the latest assistant response
-      // Azure Foundry format: messages array with role and content fields
-      const assistantMessage = messages
-        .reverse()
-        .find((m: any) => m.role === 'assistant' || m.role === 'assistant_message');
-
-      if (assistantMessage) {
-        // Try multiple content extraction paths
-        if (assistantMessage.content) {
-          return assistantMessage.content;
-        }
-        if (assistantMessage.text) {
-          return assistantMessage.text;
-        }
-        if (assistantMessage.text_content) {
-          return assistantMessage.text_content;
-        }
-        if (Array.isArray(assistantMessage.content) && assistantMessage.content[0]) {
-          const content = assistantMessage.content[0];
-          if (typeof content === 'string') return content;
-          if (content.text) return content.text;
-        }
-      }
-
-      return 'No response from assistant';
-    } catch (err: any) {
-      console.error('Error processing message:', {
-        message: err.message,
-        stack: err.stack
+      // Add user message to thread
+      console.log(`[AI Agent] Adding message to thread ${threadId}`);
+      await this.client.agents.createMessage(threadId, {
+        role: 'user',
+        content: userMessage
       });
-      throw err;
+
+      // Run the agent (this will use your agent's knowledge base)
+      console.log(`[AI Agent] Running agent ${this.agentId} on thread ${threadId}`);
+      const run = await this.client.agents.createRun(threadId, {
+        assistantId: this.agentId
+      });
+
+      console.log(`[AI Agent] Run created: ${run.id}, waiting for completion...`);
+
+      // Poll for run completion
+      let runStatus = await this.client.agents.getRun(threadId, run.id);
+      let attempts = 0;
+      const maxAttempts = 30;
+
+      while (runStatus.status === 'queued' || runStatus.status === 'in_progress') {
+        if (attempts >= maxAttempts) {
+          throw new Error('Agent run timed out');
+        }
+        
+        console.log(`[AI Agent] Run status: ${runStatus.status} (attempt ${attempts + 1}/${maxAttempts})`);
+        await new Promise(resolve => setTimeout(resolve, 1000));
+        runStatus = await this.client.agents.getRun(threadId, run.id);
+        attempts++;
+      }
+
+      if (runStatus.status === 'failed') {
+        console.error('[AI Agent] Run failed:', runStatus);
+        throw new Error(`Agent run failed: ${runStatus.lastError?.message || 'Unknown error'}`);
+      }
+
+      if (runStatus.status !== 'completed') {
+        console.error('[AI Agent] Unexpected run status:', runStatus.status);
+        throw new Error(`Unexpected run status: ${runStatus.status}`);
+      }
+
+      console.log('[AI Agent] Run completed, fetching messages...');
+
+      // Get messages from the thread
+      const messages = await this.client.agents.listMessages(threadId);
+      
+      // Find the latest assistant message
+      const assistantMessages = messages.data
+        .filter((msg: any) => msg.role === 'assistant')
+        .sort((a: any, b: any) => b.createdAt - a.createdAt);
+
+      if (assistantMessages.length === 0) {
+        console.warn('[AI Agent] No assistant messages found');
+        return "I apologize, but I couldn't generate a response. Please try again.";
+      }
+
+      const latestMessage = assistantMessages[0];
+      
+      // Extract text content
+      let responseText = '';
+      if (latestMessage.content && Array.isArray(latestMessage.content)) {
+        for (const contentItem of latestMessage.content) {
+          if (contentItem.type === 'text' && contentItem.text) {
+            responseText += contentItem.text.value || contentItem.text;
+          }
+        }
+      } else if (typeof latestMessage.content === 'string') {
+        responseText = latestMessage.content;
+      }
+
+      if (!responseText) {
+        console.warn('[AI Agent] Empty response text');
+        return "I received your message but couldn't formulate a response. Please try rephrasing your question.";
+      }
+
+      console.log(`[AI Agent] Response generated (${responseText.length} chars)`);
+      return responseText;
+
+    } catch (err: any) {
+      console.error('[AI Agent] Error processing message:', {
+        message: err.message,
+        stack: err.stack,
+        response: err.response?.data
+      });
+      
+      // Return friendly error messages
+      if (err.message?.includes('401') || err.message?.includes('Unauthorized')) {
+        return "I'm having trouble authenticating with the AI service. Please check the configuration.";
+      } else if (err.message?.includes('429') || err.message?.includes('rate limit')) {
+        return "I'm currently experiencing high demand. Please try again in a moment.";
+      } else if (err.message?.includes('timeout')) {
+        return "The request took too long to process. Please try a simpler question.";
+      } else {
+        return "I apologize, but I encountered an error processing your request. Please try again or contact support if the issue persists.";
+      }
     }
   }
 
@@ -284,7 +174,7 @@ export class AIAgentService {
    * Validate that the service is properly configured
    */
   isConfigured(): boolean {
-    return !!(this.endpoint && this.apiKey);
+    return !!(this.endpoint && this.apiKey && !this.demoMode);
   }
 
   /**
