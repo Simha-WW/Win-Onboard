@@ -14,7 +14,8 @@ import {
   FiBarChart2, 
   FiSettings,
   FiBriefcase,
-  FiLogOut
+  FiLogOut,
+  FiGift
 } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -30,6 +31,7 @@ export const HrShell = () => {
     { path: '/hr/documents', label: 'Documents & BGV', icon: <FiFileText /> },
     { path: '/hr/it-progress', label: 'IT Progress', icon: <FiCpu /> },
     { path: '/hr/reports', label: 'Reports & Exports', icon: <FiBarChart2 /> },
+    { path: '/hr/birthdays', label: 'Birthdays', icon: <FiGift /> },
     { path: '/hr/settings', label: 'Settings', icon: <FiSettings /> }
   ];
 
