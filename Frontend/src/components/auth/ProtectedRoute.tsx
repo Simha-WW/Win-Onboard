@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'HR' | 'FRESHER' | 'IT';
+  requiredRole?: 'HR' | 'FRESHER' | 'IT' | 'LD';
   fallbackPath?: string;
 }
 
@@ -72,6 +72,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       hasRequiredRole = user.role === 'FRESHER';
     } else if (requiredRole === 'IT') {
       hasRequiredRole = user.role === 'IT';
+    } else if (requiredRole === 'LD') {
+      hasRequiredRole = user.role === 'LD';
     }
 
     if (!hasRequiredRole) {

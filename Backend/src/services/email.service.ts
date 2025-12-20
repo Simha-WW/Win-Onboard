@@ -326,13 +326,14 @@ This is an automated message. Please do not reply to this email.
   }
 
   /**
-   * Send IT equipment notification when new user is onboarded
+   * Send IT equipment notification when new user is onboarded with BGV PDF attachment
    */
   async sendITEquipmentNotification({
     itMemberEmail,
     itMemberName,
     fresherName,
     fresherEmail,
+    fresherId,
     designation,
     department,
     startDate
@@ -341,6 +342,7 @@ This is an automated message. Please do not reply to this email.
     itMemberName: string;
     fresherName: string;
     fresherEmail: string;
+    fresherId?: number;
     designation: string;
     department: string;
     startDate: string;
@@ -366,7 +368,7 @@ This is an automated message. Please do not reply to this email.
         startDate
       });
 
-      const mailOptions = {
+      const mailOptions: any = {
         from: `"HR Department" <${process.env.SMTP_USER}>`,
         to: itMemberEmail,
         subject: subject,
@@ -393,12 +395,35 @@ Equipment Required:
 
 Please ensure all equipment is ready and configured before their start date.
 
+Please refer to the attached BGV form for complete employee information.
+
 Best regards,
 HR Department
 
 This is an automated notification from the onboarding system.
         `.trim()
       };
+
+      // Generate and attach BGV PDF if fresherId is provided
+      if (fresherId) {
+        try {
+          console.log(`📄 Generating BGV PDF attachment for fresher ${fresherId}...`);
+          const { BGVPdfService } = await import('./bgv-pdf.service');
+          const pdfBuffer = await BGVPdfService.generateBGVPDF(fresherId);
+          
+          mailOptions.attachments = [
+            {
+              filename: `BGV_Form_${fresherName.replace(/\s+/g, '_')}_${Date.now()}.pdf`,
+              content: pdfBuffer,
+              contentType: 'application/pdf'
+            }
+          ];
+          console.log(`✅ BGV PDF attachment added to IT notification email`);
+        } catch (pdfError) {
+          console.error('⚠️ Failed to generate BGV PDF attachment:', pdfError);
+          // Continue sending email without PDF attachment
+        }
+      }
 
       const info = await instance.transporter.sendMail(mailOptions);
       
@@ -606,13 +631,14 @@ This is an automated notification from the onboarding system.
   }
 
   /**
-   * Send document verification request to vendor
+   * Send document verification request to vendor with BGV PDF attachment
    */
   async sendVendorDocumentVerification({
     vendorEmail,
     vendorName,
     fresherName,
     fresherEmail,
+    fresherId,
     designation,
     department,
     documents
@@ -621,6 +647,7 @@ This is an automated notification from the onboarding system.
     vendorName: string;
     fresherName: string;
     fresherEmail: string;
+    fresherId?: number;
     designation: string;
     department: string;
     documents: {
@@ -652,7 +679,7 @@ This is an automated notification from the onboarding system.
         documents
       });
 
-      const mailOptions = {
+      const mailOptions: any = {
         from: `"HR Department" <${process.env.SMTP_USER}>`,
         to: vendorEmail,
         subject: subject,
@@ -679,6 +706,8 @@ ${documents.educationDocumentUrls && documents.educationDocumentUrls.length > 0 
 
 Please access the documents using the links provided in the HTML version of this email and verify their originality. Kindly provide your verification report at your earliest convenience.
 
+Please refer to the attached BGV form for complete employee information.
+
 Thank you for your assistance.
 
 Best regards,
@@ -687,6 +716,27 @@ HR Department
 This is an automated notification from the onboarding system.
         `.trim()
       };
+
+      // Generate and attach BGV PDF if fresherId is provided
+      if (fresherId) {
+        try {
+          console.log(`📄 Generating BGV PDF attachment for fresher ${fresherId}...`);
+          const { BGVPdfService } = await import('./bgv-pdf.service');
+          const pdfBuffer = await BGVPdfService.generateBGVPDF(fresherId);
+          
+          mailOptions.attachments = [
+            {
+              filename: `BGV_Form_${fresherName.replace(/\s+/g, '_')}_${Date.now()}.pdf`,
+              content: pdfBuffer,
+              contentType: 'application/pdf'
+            }
+          ];
+          console.log(`✅ BGV PDF attachment added to email`);
+        } catch (pdfError) {
+          console.error('⚠️ Failed to generate BGV PDF attachment:', pdfError);
+          // Continue sending email without PDF attachment
+        }
+      }
 
       const info = await instance.transporter.sendMail(mailOptions);
       
@@ -930,6 +980,182 @@ This is an automated notification from the onboarding system.
     <div class="footer">
         <p>This is an automated notification from the employee onboarding system.</p>
         <p>For questions or concerns, please contact the HR department.</p>
+    </div>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
+   * Send training assignment notification to L&D team
+   */
+  async sendLDTrainingNotification({
+    ldMemberEmail,
+    ldMemberName,
+    fresherId,
+    fresherName,
+    fresherEmail,
+    designation,
+    department
+  }: {
+    ldMemberEmail: string;
+    ldMemberName: string;
+    fresherId: number;
+    fresherName: string;
+    fresherEmail: string;
+    designation: string;
+    department: string;
+  }): Promise<EmailSendResult> {
+    try {
+      const instance = new EmailService();
+
+      if (!instance.transporter) {
+        return {
+          success: false,
+          error: 'Email service not initialized'
+        };
+      }
+
+      const subject = `📚 Training Assignment Required - New Employee: ${fresherName}`;
+
+      const htmlContent = instance.generateLDTrainingNotificationHTML({
+        ldMemberName,
+        fresherId,
+        fresherName,
+        fresherEmail,
+        designation,
+        department
+      });
+
+      const mailOptions: any = {
+        from: `"HR Department" <${process.env.SMTP_USER}>`,
+        to: ldMemberEmail,
+        subject: subject,
+        html: htmlContent,
+        text: `
+Training Assignment Required
+
+Dear ${ldMemberName},
+
+A new employee has joined our organization and requires mandatory training assignments.
+
+Employee Details:
+- ID: ${fresherId}
+- Name: ${fresherName}
+- Email: ${fresherEmail}
+- Designation: ${designation}
+- Department: ${department}
+
+ACTION REQUIRED:
+Please create and assign mandatory trainings for this employee as per company policy and their role requirements.
+
+Please refer to the attached BGV form for complete employee information to help customize the training plan.
+
+Best regards,
+HR Department
+
+This is an automated notification from the employee onboarding system.
+        `.trim()
+      };
+
+      // Generate and attach BGV PDF
+      try {
+        console.log(`📄 Generating BGV PDF attachment for L&D notification...`);
+        const { BGVPdfService } = await import('./bgv-pdf.service');
+        const pdfBuffer = await BGVPdfService.generateBGVPDF(fresherId);
+
+        mailOptions.attachments = [
+          {
+            filename: `BGV_Form_${fresherName.replace(/\s+/g, '_')}_${Date.now()}.pdf`,
+            content: pdfBuffer,
+            contentType: 'application/pdf'
+          }
+        ];
+        console.log(`✅ BGV PDF attachment added to L&D notification email`);
+      } catch (pdfError) {
+        console.error('⚠️ Failed to generate BGV PDF attachment:', pdfError);
+      }
+
+      const info = await instance.transporter.sendMail(mailOptions);
+
+      console.log(`✅ L&D training notification sent to: ${ldMemberEmail}`);
+      console.log(`📧 Message ID: ${info.messageId}`);
+
+      return {
+        success: true,
+        messageId: info.messageId
+      };
+
+    } catch (error) {
+      console.error('❌ Failed to send L&D training notification:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Generate HTML content for L&D training notification
+   */
+  private generateLDTrainingNotificationHTML({
+    ldMemberName,
+    fresherId,
+    fresherName,
+    fresherEmail,
+    designation,
+    department
+  }: {
+    ldMemberName: string;
+    fresherId: number;
+    fresherName: string;
+    fresherEmail: string;
+    designation: string;
+    department: string;
+  }): string {
+    return `
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Training Assignment Required</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
+        .container { background-color: #ffffff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #28a745; }
+        .header h1 { color: #28a745; margin: 0; font-size: 28px; }
+        .employee-details { background-color: #f8f9fa; border-left: 4px solid #17a2b8; padding: 20px; margin: 20px 0; }
+        .action-required { background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 20px; margin: 20px 0; }
+        .action-required h3 { color: #856404; margin-top: 0; }
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; font-size: 14px; color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>📚 Training Assignment Required</h1>
+            <p>New Employee Onboarding</p>
+        </div>
+        <p>Dear ${ldMemberName},</p>
+        <p>A new employee has joined our organization and requires <strong>mandatory training assignments</strong>.</p>
+        <div class="employee-details">
+            <h3>Employee Information</h3>
+            <p><strong>ID:</strong> ${fresherId}</p>
+            <p><strong>Name:</strong> ${fresherName}</p>
+            <p><strong>Email:</strong> ${fresherEmail}</p>
+            <p><strong>Designation:</strong> ${designation}</p>
+            <p><strong>Department:</strong> ${department}</p>
+        </div>
+        <div class="action-required">
+            <h3>⚠️ ACTION REQUIRED</h3>
+            <p><strong>Please create and assign mandatory trainings</strong> for this employee as per company policy.</p>
+        </div>
+        <p>The complete BGV form is attached for your reference to help customize the training plan.</p>
+        <p>For any questions, please contact the HR department.</p>
+        <div class="footer">
+            <p><strong>Best regards,</strong><br>HR Department<br>WinWire Technologies</p>
+        </div>
     </div>
 </body>
 </html>

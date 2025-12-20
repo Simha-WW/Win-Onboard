@@ -15,6 +15,7 @@ interface VendorDetails {
 }
 
 interface DocumentVerificationRequest {
+  fresherId: number;
   fresherName: string;
   fresherEmail: string;
   designation: string;
@@ -81,6 +82,7 @@ export class VendorService {
           vendorName: vendor.vendor_name,
           fresherName: requestData.fresherName,
           fresherEmail: requestData.fresherEmail,
+          fresherId: requestData.fresherId,
           designation: requestData.designation,
           department: requestData.department,
           documents: requestData.documents

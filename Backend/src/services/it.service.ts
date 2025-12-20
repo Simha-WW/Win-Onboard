@@ -16,6 +16,7 @@ interface ITUser {
 }
 
 interface NewUserNotification {
+  fresherId: number;
   fresherName: string;
   fresherEmail: string;
   designation: string;
@@ -126,6 +127,7 @@ export class ITService {
             itMemberName: `${itMember.first_name} ${itMember.last_name}`,
             fresherName: fresherData.fresherName,
             fresherEmail: fresherData.fresherEmail,
+            fresherId: fresherData.fresherId,
             designation: fresherData.designation,
             department: fresherData.department,
             startDate: fresherData.startDate
@@ -335,6 +337,7 @@ export class ITService {
         });
 
         await this.sendEquipmentNotification({
+          fresherId: fresherId,
           fresherName: `${fresher.first_name} ${fresher.last_name}`,
           fresherEmail: fresher.email,
           designation: fresher.designation || 'Not specified',
@@ -348,29 +351,24 @@ export class ITService {
         console.error('⚠️ IT notification failed (non-critical):', itError);
       }
 
-      // Send email to vendor for document verification
+      // Send email to L&D for training assignment
       try {
-        console.log('📧 Sending document verification request to vendor...');
+        console.log('📚 Sending training assignment request to L&D team...');
         
-        const { VendorService } = await import('./vendor.service');
+        const { LearningDevelopmentService } = await import('./learning-development.service');
         
-        await VendorService.sendDocumentVerificationRequest({
+        await LearningDevelopmentService.sendTrainingNotification({
+          fresherId: fresherId,
           fresherName: `${fresher.first_name} ${fresher.last_name}`,
           fresherEmail: fresher.email,
           designation: fresher.designation || 'Not specified',
-          department: fresher.department || 'Not specified',
-          documents: {
-            aadharUrl: documents.aadhaar_doc_file_url,
-            panCardUrl: documents.pan_file_url,
-            resumeUrl: documents.resume_file_url,
-            educationDocumentUrls: educationDocumentUrls
-          }
+          department: fresher.department || 'Not specified'
         });
 
-        console.log('✅ Vendor document verification request sent successfully');
-      } catch (vendorError) {
-        // Log vendor notification failure but don't fail the entire process
-        console.error('⚠️ Vendor notification failed (non-critical):', vendorError);
+        console.log('✅ L&D training notification sent successfully');
+      } catch (ldError) {
+        // Log L&D notification failure but don't fail the entire process
+        console.error('⚠️ L&D notification failed (non-critical):', ldError);
       }
       
       // Create IT task record
