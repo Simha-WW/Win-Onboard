@@ -38,7 +38,9 @@ class HrController {
         dateOfBirth: req.body.dateOfBirth,
         phoneNumber: req.body.phoneNumber,
         joiningDate: req.body.joiningDate,
-        designation: req.body.designation
+        designation: req.body.designation,
+        department: req.body.department,
+        baseLocation: req.body.baseLocation
       };
 
       // Validate required fields

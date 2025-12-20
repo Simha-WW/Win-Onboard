@@ -16,6 +16,8 @@ interface FresherData {
   phoneNumber?: string;
   joiningDate?: string;
   designation?: string;
+  department?: string;
+  baseLocation?: string;
 }
 
 interface CreateFresherResponse {

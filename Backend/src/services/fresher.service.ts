@@ -22,6 +22,7 @@ interface FresherInput {
   joiningDate?: string;
   designation?: string;
   department?: string;
+  baseLocation?: string;
   managerEmail?: string;
 }
 
@@ -35,6 +36,7 @@ interface FresherRecord {
   joiningDate?: string;
   designation?: string;
   department?: string;
+  baseLocation?: string;
   managerEmail?: string;
   username: string;
   passwordHash: string;
@@ -107,6 +109,7 @@ class FresherService {
         joiningDate: fresherData.joiningDate || undefined,
         designation: fresherData.designation?.trim() || undefined,
         department: fresherData.department?.trim() || undefined,
+        baseLocation: fresherData.baseLocation?.trim() || undefined,
         managerEmail: fresherData.managerEmail?.trim() || undefined,
         username,
         passwordHash,
@@ -395,11 +398,11 @@ class FresherService {
       const insertQuery = `
         INSERT INTO freshers (
           first_name, last_name, email, date_of_birth, phone,
-          username, password_hash, department, designation, joining_date,
+          username, password_hash, department, designation, base_location, joining_date,
           manager_email, status, hr_id
         ) VALUES (
           @firstName, @lastName, @email, @dateOfBirth, @phone,
-          @username, @passwordHash, @department, @designation, @joiningDate,
+          @username, @passwordHash, @department, @designation, @baseLocation, @joiningDate,
           @managerEmail, @status, @hrId
         );
         SELECT SCOPE_IDENTITY() as newId;
@@ -420,6 +423,7 @@ class FresherService {
         .input('passwordHash', mssql.NVarChar(255), fresher.passwordHash)
         .input('department', mssql.NVarChar(100), fresher.department || null)
         .input('designation', mssql.NVarChar(100), fresher.designation || null)
+        .input('baseLocation', mssql.NVarChar(100), fresher.baseLocation || null)
         .input('joiningDate', mssql.Date, fresher.joiningDate ? new Date(fresher.joiningDate) : null)
         .input('managerEmail', mssql.NVarChar(255), fresher.managerEmail || null)
         .input('status', mssql.NVarChar(20), fresher.status)

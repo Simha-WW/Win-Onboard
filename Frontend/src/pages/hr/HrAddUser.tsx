@@ -25,6 +25,8 @@ interface FormData {
   phoneNumber: string;
   joiningDate: string;
   designation: string;
+  department: string;
+  baseLocation: string;
 }
 
 interface FormErrors {
@@ -41,7 +43,9 @@ export const HrAddUser = () => {
     dateOfBirth: '',
     phoneNumber: '',
     joiningDate: '',
-    designation: ''
+    designation: '',
+    department: '',
+    baseLocation: ''
   });
 
   const [errors, setErrors] = useState<FormErrors>({});
@@ -133,6 +137,8 @@ export const HrAddUser = () => {
         phoneNumber: formData.phoneNumber || undefined,
         joiningDate: formData.joiningDate || undefined,
         designation: formData.designation || undefined,
+        department: formData.department || undefined,
+        baseLocation: formData.baseLocation || undefined,
       });
       
       // TODO: Handle different response scenarios based on backend implementation
@@ -147,7 +153,9 @@ export const HrAddUser = () => {
         dateOfBirth: '',
         phoneNumber: '',
         joiningDate: '',
-        designation: ''
+        designation: '',
+        department: '',
+        baseLocation: ''
       });
 
     } catch (error) {
@@ -482,11 +490,9 @@ export const HrAddUser = () => {
             }}>
               Role / Designation
             </label>
-            <input
-              type="text"
+            <select
               value={formData.designation}
               onChange={(e) => handleInputChange('designation', e.target.value)}
-              placeholder="Enter role or designation"
               style={{
                 width: '100%',
                 padding: '12px',
@@ -494,12 +500,102 @@ export const HrAddUser = () => {
                 borderRadius: '8px',
                 fontSize: '14px',
                 color: '#374151',
-                backgroundColor: 'white'
+                backgroundColor: 'white',
+                cursor: 'pointer'
               }}
-            />
+            >
+              <option value="">Select designation</option>
+              <option value="SDT">SDT</option>
+              <option value="SDE">SDE</option>
+              <option value="Technical Lead">Technical Lead</option>
+              <option value="Module Lead">Module Lead</option>
+              <option value="Architect">Architect</option>
+              <option value="Principal Architect">Principal Architect</option>
+            </select>
             {errors.designation && (
               <span style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', display: 'block' }}>
                 {errors.designation}
+              </span>
+            )}
+          </div>
+
+          {/* Department */}
+          <div style={{ marginTop: '20px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '8px'
+            }}>
+              Department
+            </label>
+            <select
+              value={formData.department}
+              onChange={(e) => handleInputChange('department', e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: `1px solid ${errors.department ? '#ef4444' : '#d1d5db'}`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                color: '#374151',
+                backgroundColor: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="">Select department</option>
+              <option value="D&A">D&A</option>
+              <option value="App Dev">App Dev</option>
+              <option value="Agentic AI">Agentic AI</option>
+              <option value="HR">HR</option>
+              <option value="Admin">Admin</option>
+              <option value="Finance">Finance</option>
+              <option value="Delivery">Delivery</option>
+              <option value="IT">IT</option>
+              <option value="L&D">L&D</option>
+              <option value="Operations">Operations</option>
+              <option value="Support">Support</option>
+            </select>
+            {errors.department && (
+              <span style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', display: 'block' }}>
+                {errors.department}
+              </span>
+            )}
+          </div>
+
+          {/* Location */}
+          <div style={{ marginTop: '20px' }}>
+            <label style={{
+              display: 'block',
+              fontSize: '14px',
+              fontWeight: '600',
+              color: '#374151',
+              marginBottom: '8px'
+            }}>
+              Location
+            </label>
+            <select
+              value={formData.baseLocation}
+              onChange={(e) => handleInputChange('baseLocation', e.target.value)}
+              style={{
+                width: '100%',
+                padding: '12px',
+                border: `1px solid ${errors.baseLocation ? '#ef4444' : '#d1d5db'}`,
+                borderRadius: '8px',
+                fontSize: '14px',
+                color: '#374151',
+                backgroundColor: 'white',
+                cursor: 'pointer'
+              }}
+            >
+              <option value="">Select location</option>
+              <option value="Hyderabad">Hyderabad</option>
+              <option value="Banglore">Banglore</option>
+            </select>
+            {errors.baseLocation && (
+              <span style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', display: 'block' }}>
+                {errors.baseLocation}
               </span>
             )}
           </div>
