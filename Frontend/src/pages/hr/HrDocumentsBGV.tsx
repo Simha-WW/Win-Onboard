@@ -220,17 +220,17 @@ export const HrDocumentsBGV = () => {
   const handleSendToIT = async (fresherId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    const confirmSend = window.confirm('Are you sure you want to send this candidate to IT team? This will initiate the IT onboarding process.');
+    const confirmSend = window.confirm('Are you sure you want to send this candidate to Admin? This will notify IT and L&D teams to begin onboarding.');
     if (!confirmSend) return;
 
     try {
       await hrApiService.sendToIt(fresherId);
-      alert('Successfully sent to IT team!');
+      alert('Successfully sent to Admin! IT and L&D teams have been notified.');
       // Refresh the submissions list
       fetchSubmissions();
     } catch (error: any) {
-      alert(error.message || 'Failed to send to IT team');
-      console.error('Error sending to IT:', error);
+      alert(error.message || 'Failed to send to Admin');
+      console.error('Error sending to Admin:', error);
     }
   };
 
@@ -639,7 +639,7 @@ export const HrDocumentsBGV = () => {
                           opacity: 0.8,
                           whiteSpace: 'nowrap'
                         }}
-                        title="Already sent to IT and Vendor"
+                        title="Already sent to Admin"
                       >
                         Sent
                         <FiCheckCircle size={12} />
@@ -647,7 +647,7 @@ export const HrDocumentsBGV = () => {
                     ) : (
                       <button
                         style={{
-                          width: '90px',
+                          width: '140px',
                           padding: '7px 10px',
                           backgroundColor: '#10b981',
                           color: 'white',
@@ -666,15 +666,15 @@ export const HrDocumentsBGV = () => {
                         onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#059669'}
                         onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#10b981'}
                         onClick={(e) => handleSendToIT(submission.fresher_id, e)}
-                        title="Send to IT and Vendor"
+                        title="Send to Admin"
                       >
-                        Send
+                        Send to Admin
                         <FiCpu size={12} />
                       </button>
                     )
                   )}
 
-                  {/* Vendor Verification Buttons - only show if sent to IT and vendor, and not yet verified/rejected */}
+                  {/* Vendor Verification Buttons - only show if sent to Admin, and not yet verified/rejected */}
                   {submission.sent_to_it === 1 && 
                    submission.vendor_verified === 0 && 
                    submission.vendor_rejected === 0 && (

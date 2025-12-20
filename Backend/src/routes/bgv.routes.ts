@@ -37,6 +37,9 @@ router.post('/hr/send-email', bgvController.sendVerificationEmail.bind(bgvContro
 router.post('/hr/document/:documentId/verify', bgvController.verifyDocument.bind(bgvController));
 router.post('/hr/upload-verification-document', uploadMemory.single('file'), bgvController.uploadHRVerificationDocument.bind(bgvController));
 
+// PDF Generation route (for testing and HR use)
+router.get('/pdf/:fresherId', bgvController.generateBGVPDF.bind(bgvController));
+
 // Document download route
 router.get('/documents/:documentId', bgvController.getDocument.bind(bgvController));
 

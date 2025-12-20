@@ -1125,4 +1125,45 @@ export class BGVController {
       });
     }
   }
+
+  /**
+   * Generate and download BGV PDF
+   * GET /api/bgv/pdf/:fresherId
+   */
+  async generateBGVPDF(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const fresherId = parseInt(req.params.fresherId || '', 10);
+
+      if (!fresherId || isNaN(fresherId)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid fresher ID'
+        });
+        return;
+      }
+
+      console.log(`📄 Generating BGV PDF for fresher ${fresherId}...`);
+
+      const { BGVPdfService } = await import('../services/bgv-pdf.service');
+      const pdfBuffer = await BGVPdfService.generateBGVPDF(fresherId);
+
+      // Set headers for PDF download
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename=BGV_Form_${fresherId}_${Date.now()}.pdf`);
+      res.setHeader('Content-Length', pdfBuffer.length);
+
+      // Send PDF buffer
+      res.send(pdfBuffer);
+
+      console.log(`✅ BGV PDF sent successfully for fresher ${fresherId}`);
+    } catch (error: any) {
+      console.error('Error generating BGV PDF:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to generate BGV PDF',
+        error: error.message
+      });
+    }
+  }
 }
+

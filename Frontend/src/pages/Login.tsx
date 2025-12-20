@@ -224,6 +224,9 @@ export const Login: React.FC = () => {
         if (data.userType === 'IT') {
           console.log('Navigating to IT portal');
           window.location.href = '/it';
+        } else if (data.userType === 'LD') {
+          console.log('Navigating to L&D portal');
+          window.location.href = '/ld';
         } else {
           console.log('Navigating to HR portal');
           // Reload the page to trigger AuthContext to pick up the new token

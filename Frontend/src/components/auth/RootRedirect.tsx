@@ -46,6 +46,10 @@ export const RootRedirect: React.FC = () => {
     return <Navigate to="/hr" replace />;
   } else if (user.role === 'FRESHER') {
     return <Navigate to="/dashboard" replace />;
+  } else if (user.role === 'IT') {
+    return <Navigate to="/it" replace />;
+  } else if (user.role === 'LD') {
+    return <Navigate to="/ld" replace />;
   }
 
   // Fallback to login

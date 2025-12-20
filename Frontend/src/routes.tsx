@@ -35,6 +35,10 @@ import { HrBirthdays } from './pages/hr/HrBirthdays';
 import { ItShell } from './pages/it/ItShell';
 import { ItTaskDetail } from './pages/it/ItTaskDetail';
 
+// L&D Portal Components
+import { LdShell } from './pages/ld/LdShell';
+import { LdDashboard } from './pages/ld/LdDashboard';
+
 /**
  * Router configuration with all application routes
  */
@@ -171,6 +175,41 @@ export const router = createBrowserRouter([
         <ItTaskDetail />
       </ProtectedRoute>
     )
+  },
+  // L&D Portal Routes (protected)
+  {
+    path: '/ld',
+    element: (
+      <ProtectedRoute requiredRole="LD">
+        <LdShell />
+      </ProtectedRoute>
+    ),
+    children: [
+      {
+        index: true,
+        element: <LdDashboard />
+      },
+      {
+        path: 'training-assignments',
+        element: <div style={{ padding: '2rem' }}>Training Assignments - Coming Soon</div>
+      },
+      {
+        path: 'new-employees',
+        element: <div style={{ padding: '2rem' }}>New Employees - Coming Soon</div>
+      },
+      {
+        path: 'schedule',
+        element: <div style={{ padding: '2rem' }}>Training Schedule - Coming Soon</div>
+      },
+      {
+        path: 'reports',
+        element: <div style={{ padding: '2rem' }}>Reports - Coming Soon</div>
+      },
+      {
+        path: '*',
+        element: <Navigate to="/ld" replace />
+      }
+    ]
   },
   // Catch-all route for undefined paths
   {

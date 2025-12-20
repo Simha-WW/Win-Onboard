@@ -11,7 +11,7 @@ export interface User {
   email: string;
   firstName?: string;
   lastName?: string;
-  role: 'HR' | 'FRESHER' | 'IT';
+  role: 'HR' | 'FRESHER' | 'IT' | 'LD';
   department?: string;
   designation?: string;
   username?: string;
@@ -22,7 +22,7 @@ export interface AuthResult {
   user?: User;
   token?: string;
   error?: string;
-  userType?: 'HR' | 'IT';  // Add user type field
+  userType?: 'HR' | 'IT' | 'LD';  // Add user type field
 }
 
 export type HRRole = 'lead_hr' | 'senior_hr' | 'hr_associate';
@@ -49,13 +49,15 @@ export class AuthService {
     const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
     
     // Normalize role to match middleware expectations
-    let normalizedRole: 'HR' | 'FRESHER' | 'IT' = 'HR';
+    let normalizedRole: 'HR' | 'FRESHER' | 'IT' | 'LD' = 'HR';
     if (user.role.toLowerCase().includes('hr')) {
       normalizedRole = 'HR';
     } else if (user.role === 'FRESHER') {
       normalizedRole = 'FRESHER';
     } else if (user.role === 'IT') {
       normalizedRole = 'IT';
+    } else if (user.role === 'LD') {
+      normalizedRole = 'LD';
     }
     
     return jwt.sign(
@@ -296,7 +298,59 @@ export class AuthService {
         }
       }
       
-      // If neither authentication succeeded
+      // If IT authentication failed, try L&D user authentication (plain text password)
+      const ldResult = await pool.request()
+        .input('email', email.toLowerCase())
+        .query(`
+          SELECT id, email, password, first_name, last_name, role, department, is_active
+          FROM learning_dept
+          WHERE LOWER(email) = @email
+        `);
+      
+      if (ldResult.recordset.length > 0) {
+        const ldUser = ldResult.recordset[0];
+        
+        // Check if account is active
+        if (!ldUser.is_active) {
+          return {
+            success: false,
+            error: 'Your account has been deactivated. Please contact your administrator.'
+          };
+        }
+        
+        // Check if password is set
+        if (!ldUser.password) {
+          return {
+            success: false,
+            error: 'Password not set for this account. Please contact your administrator.'
+          };
+        }
+        
+        // Verify password (plain text comparison)
+        if (password === ldUser.password) {
+          // Transform to user format
+          const user: User = {
+            id: ldUser.id.toString(),
+            email: ldUser.email,
+            firstName: ldUser.first_name,
+            lastName: ldUser.last_name,
+            role: 'LD',  // L&D users get LD role for L&D portal access
+            department: ldUser.department || 'Learning & Development'
+          };
+          
+          // Generate JWT token
+          const token = this.generateToken(user);
+          
+          return {
+            success: true,
+            user,
+            token,
+            userType: 'LD'  // L&D users get LD userType
+          };
+        }
+      }
+      
+      // If all authentication methods failed
       return {
         success: false,
         error: 'Invalid email or password'
