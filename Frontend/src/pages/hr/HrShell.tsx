@@ -10,7 +10,7 @@ import {
   FiUserPlus,
   FiCheckSquare, 
   FiFileText, 
-  FiFolder, 
+  FiCpu, 
   FiBarChart2, 
   FiSettings,
   FiBriefcase,
@@ -28,7 +28,7 @@ export const HrShell = () => {
     { path: '/hr/candidates', label: 'Candidates & Offers', icon: <FiUsers /> },
     { path: '/hr/prejoin', label: 'Pre-Join Tasks', icon: <FiCheckSquare /> },
     { path: '/hr/documents', label: 'Documents & BGV', icon: <FiFileText /> },
-    { path: '/hr/policies', label: 'Policies & Templates', icon: <FiFolder /> },
+    { path: '/hr/it-progress', label: 'IT Progress', icon: <FiCpu /> },
     { path: '/hr/reports', label: 'Reports & Exports', icon: <FiBarChart2 /> },
     { path: '/hr/settings', label: 'Settings', icon: <FiSettings /> }
   ];

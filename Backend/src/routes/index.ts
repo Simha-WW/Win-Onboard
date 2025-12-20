@@ -12,6 +12,7 @@ import { hrRoutes } from './hr.routes';
 import { authRoutes } from './auth.routes';
 import { bgvRoutes } from './bgv.routes';
 import blobRoutes from './blob.routes';
+import itRoutes from './it.routes';
 
 const router = Router();
 
@@ -55,6 +56,13 @@ router.use('/bgv', bgvRoutes);
  * Mounted at: /api/blob/*
  */
 router.use('/blob', blobRoutes);
+
+/**
+ * IT Routes
+ * IT onboarding task management endpoints
+ * Mounted at: /api/it/*
+ */
+router.use('/it', itRoutes);
 
 /**
  * TODO: Add additional route modules as they are implemented
