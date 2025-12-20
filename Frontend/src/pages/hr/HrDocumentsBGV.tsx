@@ -3,7 +3,7 @@
  * View and verify submitted BGV forms from freshers
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   FiFileText,
@@ -20,6 +20,7 @@ import {
 import { API_BASE_URL } from '../../config';
 import { hrApiService } from '../../services/hrApi';
 import { generateSubmissionPDF } from '../../utils/pdfGenerator';
+import { useHrBgv } from '../../contexts/HrBgvContext';
 
 interface BGVSubmission {
   submission_id: number;
@@ -45,89 +46,8 @@ interface BGVSubmission {
 
 export const HrDocumentsBGV = () => {
   const navigate = useNavigate();
-  const [submissions, setSubmissions] = useState<BGVSubmission[]>([]);
-  const [loading, setLoading] = useState(true);
+  const { submissions, loading, refreshSubmissions } = useHrBgv();
   const [filter, setFilter] = useState<string>('all');
-
-  useEffect(() => {
-    fetchSubmissions();
-  }, []);
-
-  const fetchSubmissions = async () => {
-    try {
-      setLoading(true);
-      const token = localStorage.getItem('auth_token');
-      
-      const response = await fetch(`${API_BASE_URL}/bgv/hr/submissions`, {
-        headers: {
-          'Authorization': `Bearer ${token}`
-        }
-      });
-
-      if (!response.ok) throw new Error('Failed to fetch submissions');
-
-      const data = await response.json();
-      
-      // Fetch detailed verification data for each submission to calculate sections completed
-      const submissionsWithSections = await Promise.all(
-        (data.data || []).map(async (submission: BGVSubmission) => {
-          try {
-            const verificationResponse = await fetch(
-              `${API_BASE_URL}/bgv/hr/verification/${submission.fresher_id}`,
-              {
-                headers: {
-                  'Authorization': `Bearer ${token}`
-                }
-              }
-            );
-            
-            if (verificationResponse.ok) {
-              const verificationData = await verificationResponse.json();
-              const verifications = verificationData.data.verifications || [];
-              
-              // Calculate sections completed (Demographics, Personal, Education)
-              const sectionStats: Record<string, { total: number; verified: number }> = {};
-              
-              verifications.forEach((v: any) => {
-                if (!sectionStats[v.document_section]) {
-                  sectionStats[v.document_section] = { total: 0, verified: 0 };
-                }
-                sectionStats[v.document_section].total++;
-                if (v.status === 'verified') {
-                  sectionStats[v.document_section].verified++;
-                }
-              });
-              
-              // Count sections where all documents are verified
-              const sectionsCompleted = Object.values(sectionStats).filter(
-                stat => stat.total > 0 && stat.verified === stat.total
-              ).length;
-              
-              return {
-                ...submission,
-                sections_completed: sectionsCompleted,
-                total_sections: 3 // Demographics, Personal, Education
-              };
-            }
-          } catch (error) {
-            console.error(`Error fetching verification data for fresher ${submission.fresher_id}:`, error);
-          }
-          
-          return {
-            ...submission,
-            sections_completed: 0,
-            total_sections: 3
-          };
-        })
-      );
-      
-      setSubmissions(submissionsWithSections);
-    } catch (error) {
-      console.error('Error fetching BGV submissions:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const getStatusBadge = (submission: BGVSubmission) => {
     // Check vendor verification status first
@@ -261,7 +181,7 @@ export const HrDocumentsBGV = () => {
       await hrApiService.sendToIt(fresherId);
       alert('Successfully sent to IT team!');
       // Refresh the submissions list
-      fetchSubmissions();
+      refreshSubmissions();
     } catch (error: any) {
       alert(error.message || 'Failed to send to IT team');
       console.error('Error sending to IT:', error);
@@ -291,7 +211,7 @@ export const HrDocumentsBGV = () => {
       }
 
       alert('Candidate verified successfully!');
-      fetchSubmissions();
+      refreshSubmissions();
     } catch (error: any) {
       alert(error.message || 'Failed to verify candidate');
       console.error('Error verifying candidate:', error);
@@ -321,7 +241,7 @@ export const HrDocumentsBGV = () => {
       }
 
       alert('Candidate rejected successfully!');
-      fetchSubmissions();
+      refreshSubmissions();
     } catch (error: any) {
       alert(error.message || 'Failed to reject candidate');
       console.error('Error rejecting candidate:', error);

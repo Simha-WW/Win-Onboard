@@ -18,6 +18,7 @@ import {
   FiGift
 } from 'react-icons/fi';
 import { useAuth } from '../../contexts/AuthContext';
+import { HrBgvProvider } from '../../contexts/HrBgvContext';
 
 export const HrShell = () => {
   console.log('HR Shell rendering...');
@@ -159,7 +160,9 @@ export const HrShell = () => {
         overflow: 'auto',
         backgroundColor: '#f8f9fa'
       }}>
-        <Outlet />
+        <HrBgvProvider>
+          <Outlet />
+        </HrBgvProvider>
       </main>
     </div>
   );
