@@ -237,3 +237,58 @@ export const getItTaskByFresherId = async (req: Request, res: Response) => {
     });
   }
 };
+
+/**
+ * Update specific task status by fresher ID
+ * PUT /api/it/tasks/:fresherId/update
+ */
+export const updateTaskStatusByFresherId = async (req: Request, res: Response) => {
+  try {
+    const { fresherId } = req.params;
+    const { taskName, status } = req.body;
+
+    if (!fresherId) {
+      return res.status(400).json({
+        success: false,
+        message: 'Fresher ID is required'
+      });
+    }
+
+    const id = parseInt(fresherId, 10);
+
+    if (isNaN(id)) {
+      return res.status(400).json({
+        success: false,
+        message: 'Invalid fresher ID'
+      });
+    }
+
+    if (!taskName) {
+      return res.status(400).json({
+        success: false,
+        message: 'Task name is required'
+      });
+    }
+
+    if (status === undefined || status === null) {
+      return res.status(400).json({
+        success: false,
+        message: 'Status is required'
+      });
+    }
+
+    const updatedTask = await ITService.updateTaskStatusByFresherId(id, taskName, status);
+
+    return res.status(200).json({
+      success: true,
+      message: 'Task status updated successfully',
+      data: updatedTask
+    });
+  } catch (error: any) {
+    console.error('Error in updateTaskStatusByFresherId controller:', error);
+    return res.status(500).json({
+      success: false,
+      message: error.message || 'Failed to update task status'
+    });
+  }
+};

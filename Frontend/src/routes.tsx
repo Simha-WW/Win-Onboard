@@ -32,6 +32,7 @@ import { HrBirthdays } from './pages/hr/HrBirthdays';
 
 // IT Portal Components
 import { ItShell } from './pages/it/ItShell';
+import { ItTaskDetail } from './pages/it/ItTaskDetail';
 
 /**
  * Router configuration with all application routes
@@ -155,6 +156,14 @@ export const router = createBrowserRouter([
     element: (
       <ProtectedRoute requiredRole="IT">
         <ItShell />
+      </ProtectedRoute>
+    )
+  },
+  {
+    path: '/it/tasks/:fresherId',
+    element: (
+      <ProtectedRoute requiredRole="IT">
+        <ItTaskDetail />
       </ProtectedRoute>
     )
   },

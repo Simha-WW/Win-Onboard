@@ -10,7 +10,8 @@ import {
   getItTaskById,
   updateItTask,
   deleteItTask,
-  getItTaskByFresherId
+  getItTaskByFresherId,
+  updateTaskStatusByFresherId
 } from '../controllers/it.controller';
 
 const router = express.Router();
@@ -23,6 +24,9 @@ router.get('/tasks', getAllItTasks);
 
 // Get IT task by fresher ID
 router.get('/tasks/fresher/:fresherId', getItTaskByFresherId);
+
+// Update specific task status by fresher ID
+router.put('/tasks/:fresherId/update', updateTaskStatusByFresherId);
 
 // Get IT task by ID
 router.get('/tasks/:id', getItTaskById);

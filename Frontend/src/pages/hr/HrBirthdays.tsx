@@ -4,6 +4,7 @@ import { API_BASE_URL } from '../../config';
 interface BirthdayRecord {
   id: number;
   fullName: string;
+  email: string;
   dateOfBirth: string;
   dobDisplay: string;
   dayOfWeek: string;
@@ -73,6 +74,9 @@ export const HrBirthdays = () => {
               font-weight: 600; 
               border: 1px solid #1e40af;
               font-size: 14px;
+            }
+            th:nth-child(3) { 
+              width: 30%;
             }
             td { 
               border: 1px solid #e5e7eb; 
@@ -252,13 +256,14 @@ export const HrBirthdays = () => {
               <tr>
                 <th style={tableStyles.th}>Employee ID</th>
                 <th style={tableStyles.th}>Employee Name</th>
+                <th style={tableStyles.th}>Email</th>
                 <th style={tableStyles.th}>Date of Birth</th>
               </tr>
             </thead>
             <tbody style={tableStyles.tbody}>
               {data.length === 0 && (
                 <tr style={tableStyles.trOdd}>
-                  <td colSpan={3} style={tableStyles.emptyRow}>
+                  <td colSpan={4} style={tableStyles.emptyRow}>
                     🎉 No employees with birthdays this month
                   </td>
                 </tr>
@@ -269,6 +274,7 @@ export const HrBirthdays = () => {
                     <span style={{ ...tableStyles.badge, ...tableStyles.idBadge }}>#{r.id}</span>
                   </td>
                   <td style={{ ...tableStyles.td, fontWeight: 500, color: '#1f2937' }}>{r.fullName}</td>
+                  <td style={{ ...tableStyles.td, color: '#6b7280' }}>{r.email}</td>
                   <td style={tableStyles.td}>
                     <span style={{ ...tableStyles.badge, ...tableStyles.dateBadge }}>
                       🎂 {r.dobDisplay}

@@ -26,7 +26,7 @@ export const HrShell = () => {
   const hrNavItems = [
     { path: '/hr', label: 'Dashboard', icon: <FiHome /> },
     { path: '/hr/add-user', label: 'Add User', icon: <FiUserPlus /> },
-    { path: '/hr/candidates', label: 'Candidates & Offers', icon: <FiUsers /> },
+    { path: '/hr/candidates', label: 'Offers Rolledout', icon: <FiUsers /> },
     { path: '/hr/prejoin', label: 'Pre-Join Tasks', icon: <FiCheckSquare /> },
     { path: '/hr/documents', label: 'Documents & BGV', icon: <FiFileText /> },
     { path: '/hr/it-progress', label: 'IT Progress', icon: <FiCpu /> },

@@ -446,6 +446,166 @@ class FresherService {
     }
   }
 
+  /**
+   * Get detailed fresher records for a specific KPI type
+   * 
+   * @param {string} kpiType - Type of KPI (new_joinees, onboarded, yet_to_join)
+   * @param {number} year - Optional year filter
+   * @param {number} month - Optional month filter (1-12)
+   * @param {number} week - Optional week filter (1-5)
+   * @returns {Promise<any[]>} List of fresher records
+   */
+  async getKPIDetails(kpiType: string, year?: number, month?: number, week?: number): Promise<any[]> {
+    try {
+      // Build WHERE clause based on filters
+      let whereConditions: string[] = [];
+      
+      if (year) {
+        whereConditions.push(`YEAR(joining_date) = ${year}`);
+      }
+      
+      if (month) {
+        whereConditions.push(`MONTH(joining_date) = ${month}`);
+      }
+      
+      if (week) {
+        // Calculate week within the month (1-5)
+        whereConditions.push(`CEILING(DAY(joining_date) / 7.0) = ${week}`);
+      }
+      
+      // Add KPI-specific condition
+      if (kpiType === 'onboarded') {
+        whereConditions.push(`joining_date < CAST(GETDATE() AS DATE)`);
+      } else if (kpiType === 'yet_to_join') {
+        whereConditions.push(`joining_date >= CAST(GETDATE() AS DATE)`);
+      }
+      // For 'new_joinees', no additional condition needed (all matching date filters)
+      
+      const whereClause = whereConditions.length > 0 
+        ? `WHERE ${whereConditions.join(' AND ')}` 
+        : '';
+      
+      const query = `
+        SELECT 
+          id,
+          CONCAT(first_name, ' ', last_name) as candidate_name,
+          email,
+          designation as position,
+          joining_date,
+          department
+        FROM dbo.freshers
+        ${whereClause}
+        ORDER BY joining_date ASC
+      `;
+      
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      
+      const result = await pool.request().query(query);
+      
+      return result.recordset;
+      
+    } catch (error) {
+      console.error('Database error fetching KPI details:', error);
+      throw new Error(`Failed to fetch KPI details: ${error}`);
+    }
+  }
+
+  /**
+   * Get HR KPIs with optional filters
+   * 
+   * @param {number} year - Optional year filter
+   * @param {number} month - Optional month filter (1-12)
+   * @param {number} week - Optional week filter (1-52)
+   * @returns {Promise<any>} KPI metrics
+   */
+  async getHRKPIs(year?: number, month?: number, week?: number): Promise<any> {
+    try {
+      // Build WHERE clause based on filters
+      let whereConditions: string[] = [];
+      
+      if (year) {
+        whereConditions.push(`YEAR(joining_date) = ${year}`);
+      }
+      
+      if (month) {
+        whereConditions.push(`MONTH(joining_date) = ${month}`);
+      }
+      
+      if (week) {
+        // Calculate week within the month (1-5)
+        whereConditions.push(`CEILING(DAY(joining_date) / 7.0) = ${week}`);
+      }
+      
+      const whereClause = whereConditions.length > 0 
+        ? `WHERE ${whereConditions.join(' AND ')}` 
+        : '';
+      
+      const query = `
+        SELECT 
+          COUNT(*) as new_joinees,
+          SUM(CASE WHEN joining_date < CAST(GETDATE() AS DATE) THEN 1 ELSE 0 END) as onboarded
+        FROM dbo.freshers
+        ${whereClause}
+      `;
+      
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      
+      const result = await pool.request().query(query);
+      
+      const newJoinees = result.recordset[0]?.new_joinees || 0;
+      const onboarded = result.recordset[0]?.onboarded || 0;
+      const yetToJoin = newJoinees - onboarded;
+      const rejected = 0; // Placeholder for future
+      
+      return {
+        new_joinees: newJoinees,
+        onboarded: onboarded,
+        yet_to_join: yetToJoin,
+        rejected: rejected
+      };
+      
+    } catch (error) {
+      console.error('Database error fetching HR KPIs:', error);
+      throw new Error(`Failed to fetch HR KPIs: ${error}`);
+    }
+  }
+
+  /**
+   * Get pending offers (freshers with joining date in the future)
+   * Sorted by joining date (latest first)
+   * 
+   * @returns {Promise<any[]>} List of pending offers
+   */
+  async getPendingOffers(): Promise<any[]> {
+    try {
+      const query = `
+        SELECT 
+          id,
+          CONCAT(first_name, ' ', last_name) as candidate_name,
+          designation as position,
+          'Accepted' as status,
+          joining_date,
+          email
+        FROM dbo.freshers
+        WHERE joining_date > CAST(GETDATE() AS DATE)
+        ORDER BY joining_date ASC
+      `;
+      
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      
+      const result = await pool.request().query(query);
+      
+      return result.recordset;
+      
+    } catch (error) {
+      console.error('Database error fetching pending offers:', error);
+      throw new Error(`Failed to fetch pending offers: ${error}`);
+    }
+  }
+
   // TODO: Implement additional methods
   // TODO: async getFresherById(id: number): Promise<FresherRecord | null>
   // TODO: async updateFresher(id: number, data: Partial<FresherInput>): Promise<boolean>

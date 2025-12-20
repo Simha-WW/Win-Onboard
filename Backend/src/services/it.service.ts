@@ -518,12 +518,26 @@ export class ITService {
         throw new Error('No fields to update');
       }
       
-      const result = await request.query(`
+      // Update the task (without OUTPUT due to trigger)
+      await request.query(`
         UPDATE it_tasks 
         SET ${updateFields.join(', ')}, updated_at = GETDATE()
-        OUTPUT INSERTED.*
         WHERE id = @id
       `);
+      
+      // Fetch the updated record
+      const result = await pool.request()
+        .input('id', mssql.Int, id)
+        .query(`
+          SELECT 
+            it.*,
+            CONCAT(f.first_name, ' ', f.last_name) as fresher_name,
+            f.email,
+            f.designation as role
+          FROM it_tasks it
+          INNER JOIN freshers f ON it.fresher_id = f.id
+          WHERE it.id = @id
+        `);
       
       if (result.recordset.length === 0) {
         throw new Error('IT task not found');
@@ -532,6 +546,77 @@ export class ITService {
       return result.recordset[0];
     } catch (error) {
       console.error('Error updating IT task:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Update specific task status by fresher ID
+   */
+  static async updateTaskStatusByFresherId(
+    fresherId: number, 
+    taskName: string, 
+    status: number
+  ): Promise<ItTask> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+      
+      // Validate task name (should match column names in it_tasks table)
+      const validTaskNames = [
+        'work_email_generated',
+        'laptop_allocated',
+        'software_installed',
+        'access_cards_issued',
+        'training_scheduled',
+        'hardware_accessories',
+        'vpn_setup',
+        'network_access_granted',
+        'domain_account_created',
+        'security_tools_configured'
+      ];
+      
+      if (!validTaskNames.includes(taskName)) {
+        throw new Error(`Invalid task name: ${taskName}`);
+      }
+      
+      // Validate status (0 or 1)
+      if (status !== 0 && status !== 1) {
+        throw new Error('Status must be 0 or 1');
+      }
+      
+      // Update the task (without OUTPUT due to trigger)
+      await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .input('status', mssql.Bit, status)
+        .query(`
+          UPDATE it_tasks 
+          SET ${taskName} = @status, updated_at = GETDATE()
+          WHERE fresher_id = @fresherId
+        `);
+      
+      // Fetch the updated record
+      const result = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query(`
+          SELECT 
+            it.*,
+            CONCAT(f.first_name, ' ', f.last_name) as fresher_name,
+            f.email,
+            f.designation as role
+          FROM it_tasks it
+          INNER JOIN freshers f ON it.fresher_id = f.id
+          WHERE it.fresher_id = @fresherId
+        `);
+      
+      if (result.recordset.length === 0) {
+        throw new Error('IT task not found for this fresher');
+      }
+      
+      return result.recordset[0];
+    } catch (error) {
+      console.error('Error updating task status by fresher ID:', error);
       throw error;
     }
   }

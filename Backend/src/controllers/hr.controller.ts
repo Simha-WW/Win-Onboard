@@ -169,6 +169,101 @@ class HrController {
   }
 
   /**
+   * Get detailed KPI records
+   * GET /api/hr/kpi-details?type=new_joinees&year=2025&month=12&week=3
+   * 
+   * @param {Request} req - Express request object
+   * @param {Response} res - Express response object
+   */
+  async getKPIDetails(req: Request, res: Response): Promise<void> {
+    try {
+      const kpiType = req.query.type as string;
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      const week = req.query.week ? parseInt(req.query.week as string) : undefined;
+      
+      if (!kpiType || !['new_joinees', 'onboarded', 'yet_to_join'].includes(kpiType)) {
+        res.status(400).json({
+          success: false,
+          message: 'Invalid or missing KPI type. Must be one of: new_joinees, onboarded, yet_to_join'
+        });
+        return;
+      }
+      
+      const details = await fresherService.getKPIDetails(kpiType, year, month, week);
+      
+      res.status(200).json({
+        success: true,
+        data: details
+      });
+
+    } catch (error) {
+      console.error('Controller error - getKPIDetails:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  /**
+   * Get HR KPIs with optional filters
+   * GET /api/hr/kpis?year=2025&month=12&week=50
+   * 
+   * @param {Request} req - Express request object
+   * @param {Response} res - Express response object
+   */
+  async getHRKPIs(req: Request, res: Response): Promise<void> {
+    try {
+      const year = req.query.year ? parseInt(req.query.year as string) : undefined;
+      const month = req.query.month ? parseInt(req.query.month as string) : undefined;
+      const week = req.query.week ? parseInt(req.query.week as string) : undefined;
+      
+      const kpis = await fresherService.getHRKPIs(year, month, week);
+      
+      res.status(200).json({
+        success: true,
+        data: kpis
+      });
+
+    } catch (error) {
+      console.error('Controller error - getHRKPIs:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  /**
+   * Get pending offers (freshers with future joining dates)
+   * GET /api/hr/pending-offers
+   * 
+   * @param {Request} req - Express request object
+   * @param {Response} res - Express response object
+   */
+  async getPendingOffers(req: Request, res: Response): Promise<void> {
+    try {
+      const offers = await fresherService.getPendingOffers();
+      
+      res.status(200).json({
+        success: true,
+        data: offers
+      });
+
+    } catch (error) {
+      console.error('Controller error - getPendingOffers:', error);
+      
+      res.status(500).json({
+        success: false,
+        message: 'Internal server error'
+      });
+    }
+  }
+
+  /**
    * Resend welcome email
    * POST /api/hr/freshers/:id/resend-email
    * 

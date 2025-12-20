@@ -2,95 +2,99 @@
  * HR Candidates & Offers - Manage candidate pipeline and offer status
  */
 
-import React from 'react';
-import { FiEdit2, FiEye, FiMail, FiMoreHorizontal } from 'react-icons/fi';
+import React, { useState, useEffect } from 'react';
+import { API_BASE_URL } from '../../config';
+
+interface PendingOffer {
+  id: number;
+  candidate_name: string;
+  position: string;
+  status: string;
+  joining_date: string;
+  email: string;
+}
 
 export const HrCandidatesOffers = () => {
-  console.log('HR Candidates & Offers rendering...');
+  const [offers, setOffers] = useState<PendingOffer[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  // Mock candidates data - TODO: Replace with API data
-  const candidates = [
-    {
-      id: 1,
-      name: 'John Smith',
-      email: 'john.smith@email.com',
-      position: 'Software Engineer',
-      department: 'Engineering',
-      offerStatus: 'Sent',
-      salary: '$85,000',
-      startDate: '2024-01-15',
-      recruiter: 'Sarah Johnson',
-      lastActivity: '2 hours ago'
-    },
-    {
-      id: 2,
-      name: 'Emily Davis',
-      email: 'emily.davis@email.com',
-      position: 'Product Manager',
-      department: 'Product',
-      offerStatus: 'Accepted',
-      salary: '$95,000',
-      startDate: '2024-01-22',
-      recruiter: 'Mike Wilson',
-      lastActivity: '1 day ago'
-    },
-    {
-      id: 3,
-      name: 'Michael Brown',
-      email: 'michael.brown@email.com',
-      position: 'UX Designer',
-      department: 'Design',
-      offerStatus: 'Negotiating',
-      salary: '$75,000',
-      startDate: '2024-02-01',
-      recruiter: 'Lisa Chen',
-      lastActivity: '3 hours ago'
-    },
-    {
-      id: 4,
-      name: 'Sarah Wilson',
-      email: 'sarah.wilson@email.com',
-      position: 'Data Analyst',
-      department: 'Analytics',
-      offerStatus: 'Draft',
-      salary: '$70,000',
-      startDate: '2024-01-29',
-      recruiter: 'David Lee',
-      lastActivity: '5 hours ago'
-    }
-  ];
+  useEffect(() => {
+    fetchPendingOffers();
+  }, []);
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'Accepted': return '#10b981';
-      case 'Sent': return '#2563eb';
-      case 'Negotiating': return '#f59e0b';
-      case 'Draft': return '#6b7280';
-      case 'Rejected': return '#ef4444';
-      default: return '#6b7280';
+  const fetchPendingOffers = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth_token');
+      
+      const response = await fetch(`${API_BASE_URL}/hr/pending-offers`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch pending offers');
+      }
+
+      const data = await response.json();
+      setOffers(data.data);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'An error occurred');
+      console.error('Error fetching pending offers:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const getStatusBadge = (status: string) => {
-    const color = getStatusColor(status);
+  const formatDate = (dateString: string | null | undefined) => {
+    if (!dateString) {
+      return 'Apr 17, 2007';
+    }
+    const date = new Date(dateString);
+    return date.toLocaleDateString('en-US', { 
+      year: 'numeric', 
+      month: 'short', 
+      day: 'numeric' 
+    });
+  };
+
+  if (loading) {
     return (
-      <span style={{
-        backgroundColor: `${color}20`,
-        color: color,
-        padding: '4px 12px',
-        borderRadius: '6px',
-        fontSize: '12px',
-        fontWeight: '600',
-        textTransform: 'uppercase'
+      <div style={{ 
+        padding: '20px', 
+        backgroundColor: 'white', 
+        minHeight: '500px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
       }}>
-        {status}
-      </span>
+        <p style={{ color: '#6b7280', fontSize: '16px' }}>Loading pending offers...</p>
+      </div>
     );
-  };
+  }
 
-  // TODO: Add filters for status, department, recruiter
-  // TODO: Add search functionality
-  // TODO: Add bulk actions
+  if (error) {
+    return (
+      <div style={{ 
+        padding: '20px', 
+        backgroundColor: 'white', 
+        minHeight: '500px'
+      }}>
+        <div style={{
+          padding: '16px',
+          backgroundColor: '#fee',
+          border: '1px solid #fcc',
+          borderRadius: '8px',
+          color: '#c00'
+        }}>
+          Error: {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '20px', backgroundColor: 'white', minHeight: '500px' }}>
@@ -102,262 +106,162 @@ export const HrCandidatesOffers = () => {
           fontWeight: 'bold',
           marginBottom: '8px'
         }}>
-          Candidates & Offers
+          Offers Rolledout
         </h1>
         <p style={{ 
           color: '#6b7280', 
           fontSize: '16px'
         }}>
-          Manage candidate pipeline and track offer status
+          View all pending offers with future joining dates
         </p>
       </div>
 
-      {/* Action Bar */}
+      {/* Offers Table */}
       <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginBottom: '24px',
-        padding: '16px',
-        backgroundColor: '#f8f9fa',
+        border: '1px solid #e5e7eb',
         borderRadius: '12px',
-        border: '1px solid #e2e8f0'
+        overflow: 'hidden',
+        backgroundColor: 'white'
       }}>
-        <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
-          <select style={{
-            padding: '8px 12px',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            fontSize: '14px',
-            color: '#374151'
-          }}>
-            <option value="">All Status</option>
-            <option value="sent">Sent</option>
-            <option value="accepted">Accepted</option>
-            <option value="negotiating">Negotiating</option>
-            <option value="draft">Draft</option>
-          </select>
-          
-          <select style={{
-            padding: '8px 12px',
-            borderRadius: '8px',
-            border: '1px solid #d1d5db',
-            fontSize: '14px',
-            color: '#374151'
-          }}>
-            <option value="">All Departments</option>
-            <option value="engineering">Engineering</option>
-            <option value="product">Product</option>
-            <option value="design">Design</option>
-            <option value="analytics">Analytics</option>
-          </select>
-        </div>
-
-        <button style={{
-          backgroundColor: '#2563eb',
-          color: 'white',
-          padding: '10px 20px',
-          border: 'none',
-          borderRadius: '8px',
-          fontSize: '14px',
-          fontWeight: '600',
-          cursor: 'pointer'
+        <table style={{
+          width: '100%',
+          borderCollapse: 'collapse'
         }}>
-          + New Candidate
-        </button>
-      </div>
-
-      {/* Candidates Table */}
-      <div style={{
-        backgroundColor: 'white',
-        borderRadius: '12px',
-        border: '1px solid #e2e8f0',
-        overflow: 'hidden'
-      }}>
-        {/* Table Header */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr 100px',
-          gap: '16px',
-          padding: '16px',
-          backgroundColor: '#f8f9fa',
-          borderBottom: '1px solid #e2e8f0',
-          fontSize: '14px',
-          fontWeight: '600',
-          color: '#374151'
-        }}>
-          <div>Candidate</div>
-          <div>Position</div>
-          <div>Department</div>
-          <div>Status</div>
-          <div>Salary</div>
-          <div>Start Date</div>
-          <div>Actions</div>
-        </div>
-
-        {/* Table Body */}
-        {candidates.map((candidate) => (
-          <div key={candidate.id} style={{
-            display: 'grid',
-            gridTemplateColumns: '2fr 1.5fr 1fr 1fr 1fr 1fr 100px',
-            gap: '16px',
-            padding: '16px',
-            borderBottom: '1px solid #e2e8f0',
-            alignItems: 'center',
-            transition: 'background-color 0.2s ease'
-          }}
-          onMouseOver={(e) => {
-            e.currentTarget.style.backgroundColor = '#f9fafb';
-          }}
-          onMouseOut={(e) => {
-            e.currentTarget.style.backgroundColor = 'white';
-          }}>
-            {/* Candidate Info */}
-            <div>
-              <div style={{
-                fontSize: '16px',
-                fontWeight: '600',
-                color: '#1f2937',
-                marginBottom: '4px'
-              }}>
-                {candidate.name}
-              </div>
-              <div style={{
+          <thead>
+            <tr style={{ backgroundColor: '#f9fafb' }}>
+              <th style={{
+                padding: '16px 24px',
+                textAlign: 'left',
                 fontSize: '14px',
-                color: '#6b7280'
+                fontWeight: '600',
+                color: '#374151',
+                borderBottom: '1px solid #e5e7eb'
               }}>
-                {candidate.email}
-              </div>
-            </div>
-
-            {/* Position */}
-            <div style={{
-              fontSize: '14px',
-              color: '#374151',
-              fontWeight: '500'
-            }}>
-              {candidate.position}
-            </div>
-
-            {/* Department */}
-            <div style={{
-              fontSize: '14px',
-              color: '#6b7280'
-            }}>
-              {candidate.department}
-            </div>
-
-            {/* Status */}
-            <div>
-              {getStatusBadge(candidate.offerStatus)}
-            </div>
-
-            {/* Salary */}
-            <div style={{
-              fontSize: '14px',
-              color: '#374151',
-              fontWeight: '600'
-            }}>
-              {candidate.salary}
-            </div>
-
-            {/* Start Date */}
-            <div style={{
-              fontSize: '14px',
-              color: '#6b7280'
-            }}>
-              {candidate.startDate}
-            </div>
-
-            {/* Actions */}
-            <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
-              <button style={{
-                padding: '6px',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: '#f3f4f6',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-              title="View Details">
-                <FiEye style={{ width: '16px', height: '16px', color: '#6b7280' }} />
-              </button>
-              
-              <button style={{
-                padding: '6px',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: '#f3f4f6',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-              title="Edit">
-                <FiEdit2 style={{ width: '16px', height: '16px', color: '#6b7280' }} />
-              </button>
-              
-              <button style={{
-                padding: '6px',
-                border: 'none',
-                borderRadius: '6px',
-                backgroundColor: '#f3f4f6',
-                cursor: 'pointer',
-                display: 'flex',
-                alignItems: 'center',
-                justifyContent: 'center'
-              }}
-              title="Resend Offer">
-                <FiMail style={{ width: '16px', height: '16px', color: '#6b7280' }} />
-              </button>
-            </div>
-          </div>
-        ))}
+                Candidate
+              </th>
+              <th style={{
+                padding: '16px 24px',
+                textAlign: 'left',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#374151',
+                borderBottom: '1px solid #e5e7eb'
+              }}>
+                Position
+              </th>
+              <th style={{
+                padding: '16px 24px',
+                textAlign: 'center',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#374151',
+                borderBottom: '1px solid #e5e7eb'
+              }}>
+                Status
+              </th>
+              <th style={{
+                padding: '16px 24px',
+                textAlign: 'left',
+                fontSize: '14px',
+                fontWeight: '600',
+                color: '#374151',
+                borderBottom: '1px solid #e5e7eb'
+              }}>
+                Joining Date
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {offers.length === 0 ? (
+              <tr>
+                <td colSpan={4} style={{
+                  padding: '48px 24px',
+                  textAlign: 'center',
+                  color: '#6b7280',
+                  fontSize: '14px'
+                }}>
+                  No pending offers found. All candidates have either joined or offers are expired.
+                </td>
+              </tr>
+            ) : (
+              offers.map((offer, index) => (
+                <tr
+                  key={offer.id}
+                  style={{
+                    backgroundColor: index % 2 === 0 ? 'white' : '#f9fafb',
+                    transition: 'background-color 0.1s'
+                  }}
+                >
+                  <td style={{
+                    padding: '16px 24px',
+                    fontSize: '14px',
+                    color: '#374151',
+                    borderBottom: '1px solid #e5e7eb'
+                  }}>
+                    <div>
+                      <div style={{ fontWeight: '500' }}>{offer.candidate_name}</div>
+                      <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '2px' }}>
+                        {offer.email}
+                      </div>
+                    </div>
+                  </td>
+                  <td style={{
+                    padding: '16px 24px',
+                    fontSize: '14px',
+                    color: '#374151',
+                    borderBottom: '1px solid #e5e7eb'
+                  }}>
+                    {offer.position || 'Not specified'}
+                  </td>
+                  <td style={{
+                    padding: '16px 24px',
+                    textAlign: 'center',
+                    borderBottom: '1px solid #e5e7eb'
+                  }}>
+                    <span style={{
+                      backgroundColor: '#10b98120',
+                      color: '#10b981',
+                      padding: '4px 12px',
+                      borderRadius: '6px',
+                      fontSize: '12px',
+                      fontWeight: '600',
+                      textTransform: 'uppercase'
+                    }}>
+                      {offer.status}
+                    </span>
+                  </td>
+                  <td style={{
+                    padding: '16px 24px',
+                    fontSize: '14px',
+                    color: '#374151',
+                    borderBottom: '1px solid #e5e7eb',
+                    fontWeight: '500'
+                  }}>
+                    {formatDate(offer.joining_date)}
+                  </td>
+                </tr>
+              ))
+            )}
+          </tbody>
+        </table>
       </div>
 
-      {/* Pagination - TODO: Implement actual pagination */}
-      <div style={{
-        display: 'flex',
-        justifyContent: 'space-between',
-        alignItems: 'center',
-        marginTop: '24px',
-        padding: '16px',
-        backgroundColor: '#f8f9fa',
-        borderRadius: '12px'
-      }}>
-        <div style={{ fontSize: '14px', color: '#6b7280' }}>
-          Showing 4 of 24 candidates
+      {/* Summary Footer */}
+      {offers.length > 0 && (
+        <div style={{
+          marginTop: '16px',
+          padding: '12px 16px',
+          backgroundColor: '#f9fafb',
+          borderRadius: '8px',
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center'
+        }}>
+          <span style={{ fontSize: '14px', color: '#6b7280' }}>
+            Total Pending Offers: <strong style={{ color: '#374151' }}>{offers.length}</strong>
+          </span>
         </div>
-        <div style={{ display: 'flex', gap: '8px' }}>
-          <button style={{
-            padding: '8px 12px',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            backgroundColor: 'white',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}>
-            Previous
-          </button>
-          <button style={{
-            padding: '8px 12px',
-            border: '1px solid #d1d5db',
-            borderRadius: '6px',
-            backgroundColor: 'white',
-            cursor: 'pointer',
-            fontSize: '14px'
-          }}>
-            Next
-          </button>
-        </div>
-      </div>
-
-      {/* TODO: Add candidate profile modal */}
-      {/* TODO: Add offer letter templates */}
-      {/* TODO: Add email integration */}
-      {/* TODO: Add export functionality */}
+      )}
     </div>
   );
 };

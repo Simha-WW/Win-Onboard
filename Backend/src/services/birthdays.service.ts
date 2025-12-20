@@ -4,6 +4,7 @@ import mssql from 'mssql';
 export interface BirthdayRecord {
   id: number; // fresher_id
   fullName: string;
+  email: string;
   dateOfBirth: string; // ISO string
   dobDisplay: string; // DD-MMM
   dayOfWeek: string; // Monday, etc.
@@ -15,20 +16,20 @@ class BirthdaysService {
     try {
       const pool = getMSSQLPool();
       
-      // Fetch all birthdays for the given month from bgv_demographics with fresher_id via bgv_submissions
+      // Fetch all birthdays for the given month from freshers table using date_of_birth
       const result = await pool.request()
         .input('month', mssql.Int, month)
         .query(`
           SELECT 
-            bs.fresher_id as id,
-            bd.first_name,
-            bd.last_name,
-            bd.celebrated_dob
-          FROM dbo.bgv_demographics bd
-          INNER JOIN dbo.bgv_submissions bs ON bd.submission_id = bs.id
-          WHERE bd.celebrated_dob IS NOT NULL
-            AND MONTH(CONVERT(DATE, bd.celebrated_dob)) = @month
-          ORDER BY DAY(CONVERT(DATE, bd.celebrated_dob)) ASC
+            id,
+            first_name,
+            last_name,
+            email,
+            date_of_birth
+          FROM dbo.freshers
+          WHERE date_of_birth IS NOT NULL
+            AND MONTH(CONVERT(DATE, date_of_birth)) = @month
+          ORDER BY DAY(CONVERT(DATE, date_of_birth)) ASC
         `);
 
       const rows = result.recordset || [];
@@ -37,13 +38,14 @@ class BirthdaysService {
       return rows
         .filter((r: any) => r.first_name && r.last_name && r.id) // Filter out incomplete records
         .map((r: any) => {
-          const dob = new Date(r.celebrated_dob);
+          const dob = new Date(r.date_of_birth);
           const dayOfMonth = dob.getDate();
           const dobDisplay = dob.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' });
           const dayOfWeek = dob.toLocaleDateString('en-GB', { weekday: 'long' });
           return {
             id: r.id,
             fullName: `${r.first_name} ${r.last_name}`.trim(),
+            email: r.email || '',
             dateOfBirth: dob.toISOString(),
             dobDisplay,
             dayOfWeek,
@@ -56,66 +58,37 @@ class BirthdaysService {
     }
   }
 
-  // Return debug info: raw bgv_demographics rows and joined rows
-  async getBirthdaysDebug(month: number): Promise<{ bgvRows: any[]; joinedRows: any[] }> {
+  // Return debug info: raw freshers rows
+  async getBirthdaysDebug(month: number): Promise<{ freshersRows: any[] }> {
     try {
       const pool = getMSSQLPool();
-      const bgvResult = await pool.request()
+      const freshersResult = await pool.request()
         .input('month', mssql.Int, month)
         .query(`
           SELECT TOP 100 
-            bd.id, 
-            bs.fresher_id, 
-            bd.celebrated_dob
-          FROM dbo.bgv_demographics bd
-          INNER JOIN dbo.bgv_submissions bs ON bd.submission_id = bs.id
-          WHERE bd.celebrated_dob IS NOT NULL
-            AND MONTH(CONVERT(DATE, bd.celebrated_dob)) = @month
+            id, 
+            first_name,
+            last_name,
+            date_of_birth
+          FROM dbo.freshers
+          WHERE date_of_birth IS NOT NULL
+            AND MONTH(CONVERT(DATE, date_of_birth)) = @month
         `);
-      const bgvRows = bgvResult.recordset || [];
+      const freshersRows = freshersResult.recordset || [];
 
-      const joinResult = await pool.request()
-        .input('month', mssql.Int, month)
-        .query(`
-          SELECT 
-            bs.fresher_id, 
-            bd.first_name, 
-            bd.last_name, 
-            bd.celebrated_dob
-          FROM dbo.bgv_demographics bd
-          INNER JOIN dbo.bgv_submissions bs ON bd.submission_id = bs.id
-          WHERE bd.celebrated_dob IS NOT NULL
-            AND MONTH(CONVERT(DATE, bd.celebrated_dob)) = @month
-          ORDER BY DAY(CONVERT(DATE, bd.celebrated_dob)) ASC
-        `);
-      const joinedRows = joinResult.recordset || [];
-
-      return { bgvRows, joinedRows };
+      return { freshersRows };
     } catch (error) {
       console.error('BirthdaysService.getBirthdaysDebug error:', error);
       throw error;
     }
   }
 
-  // Inspect all actual data in both tables to understand the real structure
+  // Inspect all actual data in freshers table to understand the real structure
   async inspectAllData(): Promise<any> {
     try {
       const pool = getMSSQLPool();
       
-      // Get ALL bgv_demographics records with fresher_id from bgv_submissions
-      const bgvAll = await pool.request().query(`
-        SELECT TOP 50
-          bd.id,
-          bs.fresher_id,
-          bd.celebrated_dob,
-          bd.first_name,
-          bd.last_name
-        FROM dbo.bgv_demographics bd
-        INNER JOIN dbo.bgv_submissions bs ON bd.submission_id = bs.id
-        ORDER BY bd.id DESC
-      `);
-
-      // Get ALL freshers records with any date fields
+      // Get ALL freshers records with date_of_birth
       const freshersAll = await pool.request().query(`
         SELECT TOP 50
           id,
@@ -126,30 +99,28 @@ class BirthdaysService {
         ORDER BY id DESC
       `);
 
-      // Try to find bgv_demographics birthdays for current month
+      // Try to find birthdays for current month from freshers table
       const currentMonth = new Date().getMonth() + 1;
       const monthBirthdays = await pool.request()
         .input('month', mssql.Int, currentMonth)
         .query(`
           SELECT TOP 50
-            bs.fresher_id,
-            bd.first_name,
-            bd.last_name,
-            bd.celebrated_dob,
-            MONTH(CONVERT(DATE, bd.celebrated_dob)) as dob_month,
-            DAY(CONVERT(DATE, bd.celebrated_dob)) as dob_day
-          FROM dbo.bgv_demographics bd
-          INNER JOIN dbo.bgv_submissions bs ON bd.submission_id = bs.id
-          WHERE bd.celebrated_dob IS NOT NULL
-            AND MONTH(CONVERT(DATE, bd.celebrated_dob)) = @month
-          ORDER BY DAY(CONVERT(DATE, bd.celebrated_dob)) ASC
+            id,
+            first_name,
+            last_name,
+            date_of_birth,
+            MONTH(CONVERT(DATE, date_of_birth)) as dob_month,
+            DAY(CONVERT(DATE, date_of_birth)) as dob_day
+          FROM dbo.freshers
+          WHERE date_of_birth IS NOT NULL
+            AND MONTH(CONVERT(DATE, date_of_birth)) = @month
+          ORDER BY DAY(CONVERT(DATE, date_of_birth)) ASC
         `);
 
       return {
-        bgv_demographics_all: bgvAll.recordset,
         freshers_all: freshersAll.recordset,
         current_month_birthdays: monthBirthdays.recordset,
-        notes: 'bgv_demographics stores celebrated_dob and is linked to freshers via bgv_submissions table.'
+        notes: 'Now using dbo.freshers table with date_of_birth column for birthdays.'
       };
     } catch (error) {
       console.error('BirthdaysService.inspectAllData error:', error);

@@ -29,8 +29,17 @@ router.use(validateJWT, requireHRRole);
 // Create new fresher account
 router.post('/freshers', hrController.createFresher.bind(hrController));
 
+// Get HR KPIs with optional filters
+router.get('/kpis', hrController.getHRKPIs.bind(hrController));
+
+// Get detailed KPI records
+router.get('/kpi-details', hrController.getKPIDetails.bind(hrController));
+
 // Get all freshers with pagination and filtering
 router.get('/freshers', hrController.getFreshers.bind(hrController));
+
+// Get pending offers (freshers with future joining dates)
+router.get('/pending-offers', hrController.getPendingOffers.bind(hrController));
 
 // Get specific fresher by ID
 router.get('/freshers/:id', hrController.getFresherById.bind(hrController));

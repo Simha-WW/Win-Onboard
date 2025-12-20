@@ -287,7 +287,7 @@ export const Login: React.FC = () => {
           }}
         >
           <FiUser style={{ fontSize: '1.25rem', color: '#3b82f6' }} />
-          Login as User
+          Employee login
         </button>
 
         {/* Admin Login Option */}
@@ -319,7 +319,7 @@ export const Login: React.FC = () => {
           }}
         >
           <FiShield style={{ fontSize: '1.25rem', color: '#10b981' }} />
-          Login as Admin (HR)
+          Admin login
         </button>
       </div>
     </div>
@@ -478,14 +478,12 @@ export const Login: React.FC = () => {
         fontWeight: 'bold', 
         marginBottom: '0.5rem', 
         color: '#1f2937' 
-      }}>
-        HR Admin Login
+      }}>        Admin Login
       </h2>
       <p style={{ 
         color: '#6b7280', 
         marginBottom: '2rem' 
-      }}>
-        Sign in with your HR credentials
+      }}>        Sign in with your admin credentials
       </p>
 
       <form onSubmit={handleHRLogin} style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
@@ -638,7 +636,7 @@ export const Login: React.FC = () => {
         fontSize: '0.875rem',
         color: '#0369a1'
       }}>
-        <strong>HR Access:</strong> Only authorized HR personnel with valid credentials can access the HR portal.
+        <strong>Admin Access:</strong> Only authorized administrative personnel with valid credentials can access the admin portal.
       </div>
 
       <button
