@@ -10,7 +10,7 @@ export interface User {
   username?: string;
   designation?: string;
   department?: string;
-  role: 'HR' | 'FRESHER';
+  role: 'HR' | 'FRESHER' | 'IT';
 }
 
 export interface AuthState {

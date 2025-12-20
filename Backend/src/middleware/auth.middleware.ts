@@ -13,7 +13,7 @@ interface AuthenticatedRequest extends Request {
     email: string;
     firstName?: string;
     lastName?: string;
-    role: 'HR' | 'FRESHER';
+    role: 'HR' | 'FRESHER' | 'IT';
   };
 }
 
@@ -22,7 +22,7 @@ interface JWTPayload {
   email: string;
   firstName?: string;
   lastName?: string;
-  role: 'HR' | 'FRESHER';
+  role: 'HR' | 'FRESHER' | 'IT';
   exp: number;
   iat: number;
 }

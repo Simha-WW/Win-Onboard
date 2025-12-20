@@ -217,10 +217,18 @@ export const Login: React.FC = () => {
         localStorage.setItem('auth_user', JSON.stringify(data.user));
         console.log('Login successful, token and user stored');
         console.log('User:', data.user);
+        console.log('User Type:', data.userType);
         console.log('Token:', data.token.substring(0, 50) + '...');
         
-        // Reload the page to trigger AuthContext to pick up the new token
-        window.location.reload();
+        // Navigate based on user type
+        if (data.userType === 'IT') {
+          console.log('Navigating to IT portal');
+          window.location.href = '/it';
+        } else {
+          console.log('Navigating to HR portal');
+          // Reload the page to trigger AuthContext to pick up the new token
+          window.location.reload();
+        }
       } else {
         throw new Error(data.message || 'Login failed');
       }

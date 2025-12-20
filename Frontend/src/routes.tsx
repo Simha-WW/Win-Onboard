@@ -30,6 +30,9 @@ import { HrReportsExports } from './pages/hr/HrReportsExports';
 import { HrSettings } from './pages/hr/HrSettings';
 import { HrBirthdays } from './pages/hr/HrBirthdays';
 
+// IT Portal Components
+import { ItShell } from './pages/it/ItShell';
+
 /**
  * Router configuration with all application routes
  */
@@ -145,6 +148,15 @@ export const router = createBrowserRouter([
         element: <Navigate to="/hr" replace />
       }
     ]
+  },
+  // IT Portal Routes (protected)
+  {
+    path: '/it',
+    element: (
+      <ProtectedRoute requiredRole="IT">
+        <ItShell />
+      </ProtectedRoute>
+    )
   },
   // Catch-all route for undefined paths
   {

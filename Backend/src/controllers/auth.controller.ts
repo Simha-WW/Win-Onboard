@@ -146,7 +146,8 @@ export class AuthController {
         success: true,
         user: authResult.user,
         token: authResult.token,
-        message: 'HR authentication successful'
+        userType: authResult.userType,  // Include user type in response
+        message: 'Authentication successful'
       });
     } catch (error) {
       console.error('HR login error:', error);

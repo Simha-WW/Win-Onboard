@@ -11,7 +11,7 @@ export interface User {
   email: string;
   firstName?: string;
   lastName?: string;
-  role: 'HR' | 'FRESHER';
+  role: 'HR' | 'FRESHER' | 'IT';
   department?: string;
   designation?: string;
   username?: string;
@@ -22,6 +22,7 @@ export interface AuthResult {
   user?: User;
   token?: string;
   error?: string;
+  userType?: 'HR' | 'IT';  // Add user type field
 }
 
 export type HRRole = 'lead_hr' | 'senior_hr' | 'hr_associate';
@@ -48,11 +49,13 @@ export class AuthService {
     const jwtSecret = process.env.JWT_SECRET || 'your-secret-key';
     
     // Normalize role to match middleware expectations
-    let normalizedRole: 'HR' | 'FRESHER' = 'HR';
+    let normalizedRole: 'HR' | 'FRESHER' | 'IT' = 'HR';
     if (user.role.toLowerCase().includes('hr')) {
       normalizedRole = 'HR';
     } else if (user.role === 'FRESHER') {
       normalizedRole = 'FRESHER';
+    } else if (user.role === 'IT') {
+      normalizedRole = 'IT';
     }
     
     return jwt.sign(
@@ -188,8 +191,8 @@ export class AuthService {
       const { getMSSQLPool } = await import('../config/database');
       const pool = getMSSQLPool();
       
-      // Query HR user by email from hr_normal_login table
-      const result = await pool.request()
+      // First, try to authenticate against hr_normal_login table (hashed password)
+      const hrResult = await pool.request()
         .input('email', email.toLowerCase())
         .query(`
           SELECT id, email, hashed_password, first_name, last_name, role, department, is_active
@@ -197,60 +200,109 @@ export class AuthService {
           WHERE LOWER(email) = @email
         `);
       
-      if (result.recordset.length === 0) {
-        return {
-          success: false,
-          error: 'Invalid email or password'
-        };
+      if (hrResult.recordset.length > 0) {
+        const hrUser = hrResult.recordset[0];
+        
+        // Check if account is active
+        if (!hrUser.is_active) {
+          return {
+            success: false,
+            error: 'Your account has been deactivated. Please contact your administrator.'
+          };
+        }
+        
+        // Check if password is set
+        if (!hrUser.hashed_password) {
+          return {
+            success: false,
+            error: 'Password not set for this account. Please contact your administrator.'
+          };
+        }
+        
+        // Verify password (hashed)
+        const isPasswordValid = await bcrypt.compare(password, hrUser.hashed_password);
+        if (isPasswordValid) {
+          // Transform to user format
+          const user: User = {
+            id: hrUser.id.toString(),
+            email: hrUser.email,
+            firstName: hrUser.first_name,
+            lastName: hrUser.last_name,
+            role: 'HR',
+            department: hrUser.department
+          };
+          
+          // Generate JWT token
+          const token = this.generateToken(user);
+          
+          return {
+            success: true,
+            user,
+            token,
+            userType: 'HR'  // Add user type
+          };
+        }
       }
       
-      const hrUser = result.recordset[0];
+      // If HR authentication failed, try IT user authentication (plain text password)
+      const itResult = await pool.request()
+        .input('email', email.toLowerCase())
+        .query(`
+          SELECT id, email, password, first_name, last_name, role, department, is_active
+          FROM it_users
+          WHERE LOWER(email) = @email
+        `);
       
-      // Check if account is active
-      if (!hrUser.is_active) {
-        return {
-          success: false,
-          error: 'Your account has been deactivated. Please contact your administrator.'
-        };
+      if (itResult.recordset.length > 0) {
+        const itUser = itResult.recordset[0];
+        
+        // Check if account is active
+        if (!itUser.is_active) {
+          return {
+            success: false,
+            error: 'Your account has been deactivated. Please contact your administrator.'
+          };
+        }
+        
+        // Check if password is set
+        if (!itUser.password) {
+          return {
+            success: false,
+            error: 'Password not set for this account. Please contact your administrator.'
+          };
+        }
+        
+        // Verify password (plain text comparison)
+        if (password === itUser.password) {
+          // Transform to user format
+          const user: User = {
+            id: itUser.id.toString(),
+            email: itUser.email,
+            firstName: itUser.first_name,
+            lastName: itUser.last_name,
+            role: 'IT',
+            department: itUser.department || 'IT'
+          };
+          
+          // Generate JWT token
+          const token = this.generateToken(user);
+          
+          return {
+            success: true,
+            user,
+            token,
+            userType: 'IT'  // Add user type
+          };
+        }
       }
       
-      // Check if password is set
-      if (!hrUser.hashed_password) {
-        return {
-          success: false,
-          error: 'Password not set for this account. Please contact your administrator.'
-        };
-      }
-      
-      // Verify password
-      const isPasswordValid = await bcrypt.compare(password, hrUser.hashed_password);
-      if (!isPasswordValid) {
-        return {
-          success: false,
-          error: 'Invalid email or password'
-        };
-      }
-      
-      // Transform to user format
-      const user: User = {
-        id: hrUser.id.toString(),
-        email: hrUser.email,
-        firstName: hrUser.first_name,
-        lastName: hrUser.last_name,
-        role: 'HR',
-        department: hrUser.department
-      };
-      
-      // Generate JWT token
-      const token = this.generateToken(user);
-      
+      // If neither authentication succeeded
       return {
-        success: true,
-        user,
-        token
+        success: false,
+        error: 'Invalid email or password'
       };
     } catch (error) {
-      console.error('HR credentials validation error:', error);
+      console.error('Admin credentials validation error:', error);
       return {
         success: false,
         error: 'Authentication failed. Please try again.'

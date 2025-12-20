@@ -9,7 +9,7 @@ import { useAuth } from '../../contexts/AuthContext';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
-  requiredRole?: 'HR' | 'FRESHER';
+  requiredRole?: 'HR' | 'FRESHER' | 'IT';
   fallbackPath?: string;
 }
 
@@ -70,6 +70,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       );
     } else if (requiredRole === 'FRESHER') {
       hasRequiredRole = user.role === 'FRESHER';
+    } else if (requiredRole === 'IT') {
+      hasRequiredRole = user.role === 'IT';
     }
 
     if (!hasRequiredRole) {
@@ -80,6 +82,21 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
       
       // If fresher user tries to access HR routes, redirect to user portal
       if (user.role === 'FRESHER' && requiredRole === 'HR') {
+        return <Navigate to="/" replace />;
+      }
+
+      // If IT user tries to access HR/Fresher routes, redirect to IT portal
+      if (user.role === 'IT' && (requiredRole === 'HR' || requiredRole === 'FRESHER')) {
+        return <Navigate to="/it" replace />;
+      }
+
+      // If HR user tries to access IT routes, redirect to HR portal
+      if (user.role && user.role.toLowerCase().includes('hr') && requiredRole === 'IT') {
+        return <Navigate to="/hr" replace />;
+      }
+
+      // If fresher user tries to access IT routes, redirect to user portal
+      if (user.role === 'FRESHER' && requiredRole === 'IT') {
         return <Navigate to="/" replace />;
       }
       
