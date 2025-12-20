@@ -16,7 +16,8 @@ import {
   FiUser,
   FiMapPin,
   FiPhone,
-  FiBook
+  FiBook,
+  FiFile
 } from 'react-icons/fi';
 import { API_BASE_URL } from '../../config';
 import { documentViewerService } from '../../services/documentViewer.service';
@@ -187,6 +188,9 @@ export const HrBGVVerification = () => {
   const [selectedDocument, setSelectedDocument] = useState<DocumentVerification | null>(null);
   const [rejectComments, setRejectComments] = useState('');
   const [rejectModalOpen, setRejectModalOpen] = useState(false);
+  const [uploadingFile, setUploadingFile] = useState<boolean>(false);
+  const [attachedFileUrl, setAttachedFileUrl] = useState<string>('');
+  const [attachedFileName, setAttachedFileName] = useState<string>('');
 
   useEffect(() => {
     if (fresherId) {
@@ -664,6 +668,89 @@ export const HrBGVVerification = () => {
         );
       }
       
+      // Employment section
+      if (result.data.employment && result.data.employment.length > 0) {
+        const employmentFields = ['company_name', 'designation', 'employment_start_date', 'employment_end_date', 'reason_for_leaving'];
+        
+        verificationsData['Employment'] = result.data.employment.flatMap((emp: Employment) => 
+          Object.entries(emp)
+            .filter(([key]) => employmentFields.includes(key))
+            .map(([key, value]) => {
+              const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+              const verificationKey = `Employment-${docType}`;
+              const savedStatus = verificationMap.get(verificationKey);
+              
+              return {
+                document_type: docType,
+                document_section: 'Employment',
+                document_value: value,
+                status: savedStatus?.status || 'pending',
+                comments: savedStatus?.comments,
+                verified_at: savedStatus?.verified_at,
+                hr_first_name: savedStatus?.hr_first_name,
+                hr_last_name: savedStatus?.hr_last_name
+              };
+            })
+        );
+      }
+      
+      // Passport & Visa section
+      if (result.data.passportVisa) {
+        verificationsData['Passport'] = Object.entries(result.data.passportVisa)
+          .filter(([key]) => !['id', 'fresher_id', 'created_at', 'updated_at'].includes(key))
+          .filter(([key]) => !key.toLowerCase().includes('_url'))
+          .map(([key, value]) => {
+            const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const verificationKey = `Passport-${docType}`;
+            const savedStatus = verificationMap.get(verificationKey);
+            
+            return {
+              document_type: docType,
+              document_section: 'Passport',
+              document_value: value,
+              status: savedStatus?.status || 'pending',
+              comments: savedStatus?.comments,
+              verified_at: savedStatus?.verified_at,
+              hr_first_name: savedStatus?.hr_first_name,
+              hr_last_name: savedStatus?.hr_last_name
+            };
+          });
+      }
+      
+      // Bank/PF/NPS section
+      if (result.data.bankPfNps) {
+        verificationsData['Banking'] = Object.entries(result.data.bankPfNps)
+          .filter(([key]) => !['id', 'fresher_id', 'created_at', 'updated_at'].includes(key))
+          .filter(([key]) => !key.toLowerCase().includes('_url'))
+          .map(([key, value]) => {
+            const docType = key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase());
+            const verificationKey = `Banking-${docType}`;
+            const savedStatus = verificationMap.get(verificationKey);
+            
+            return {
+              document_type: docType,
+              document_section: 'Banking',
+              document_value: value,
+              status: savedStatus?.status || 'pending',
+              comments: savedStatus?.comments,
+              verified_at: savedStatus?.verified_at,
+              hr_first_name: savedStatus?.hr_first_name,
+              hr_last_name: savedStatus?.hr_last_name
+            };
+          });
+      }
+      
+      // Initialize empty arrays for sections that don't have data yet
+      if (!verificationsData['Employment']) {
+        verificationsData['Employment'] = [];
+      }
+      if (!verificationsData['Passport']) {
+        verificationsData['Passport'] = [];
+      }
+      if (!verificationsData['Banking']) {
+        verificationsData['Banking'] = [];
+      }
+      
       setVerifications(verificationsData);
     } catch (error: any) {
       console.error('Error fetching verification data:', error);
@@ -730,7 +817,71 @@ export const HrBGVVerification = () => {
   const handleReject = (doc: DocumentVerification) => {
     setSelectedDocument(doc);
     setRejectComments('');
+    setAttachedFileUrl('');
+    setAttachedFileName('');
     setRejectModalOpen(true);
+  };
+
+  // Handle file upload for rejection supporting documents
+  const handleRejectionFileUpload = async (file: File | null) => {
+    if (!file) {
+      setAttachedFileUrl('');
+      setAttachedFileName('');
+      return;
+    }
+
+    try {
+      const token = localStorage.getItem('auth_token');
+      
+      if (!token) {
+        console.error('Auth token not found in localStorage. Available keys:', Object.keys(localStorage));
+        throw new Error('Authentication required. Please log in again.');
+      }
+      
+      console.log('📤 Uploading verification document to backend:', { fileName: file.name, size: file.size });
+
+      setUploadingFile(true);
+      setAttachedFileName('Uploading...');
+
+      // Create FormData to send file to backend
+      const formData = new FormData();
+      formData.append('file', file);
+      formData.append('documentType', 'hr-verification');
+      formData.append('fresherId', fresherId!);
+
+      // Send file to backend for upload
+      const response = await fetch(`${API_BASE_URL}/bgv/hr/upload-verification-document`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${token}`
+        },
+        body: formData
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload file');
+      }
+
+      const result = await response.json();
+      const blobUrl = result.url || result.blobUrl;
+      
+      if (!blobUrl) {
+        throw new Error('No URL returned from server');
+      }
+
+      setAttachedFileUrl(blobUrl);
+      setAttachedFileName(file.name);
+      
+      console.log('✅ Verification document uploaded successfully:', blobUrl);
+    } catch (error: any) {
+      console.error('❌ Error uploading file:', error);
+      setAttachedFileUrl('');
+      setAttachedFileName('');
+      alert(`Failed to upload file: ${error.message}`);
+    } finally {
+      setUploadingFile(false);
+    }
   };
 
   const submitRejection = async () => {
@@ -758,7 +909,8 @@ export const HrBGVVerification = () => {
           documentType: selectedDocument.document_type,
           documentSection: selectedDocument.document_section,
           status: 'rejected',
-          comments: rejectComments
+          comments: rejectComments,
+          attachmentUrl: attachedFileUrl || undefined
         })
       });
 
@@ -785,6 +937,8 @@ export const HrBGVVerification = () => {
       setRejectModalOpen(false);
       setSelectedDocument(null);
       setRejectComments('');
+      setAttachedFileUrl('');
+      setAttachedFileName('');
     } catch (error: any) {
       console.error('Error rejecting document:', error);
       alert(error.message || 'Failed to reject document');
@@ -2739,12 +2893,89 @@ export const HrBGVVerification = () => {
               }}
             />
 
+            {/* File Upload Section */}
+            <div style={{ marginBottom: '16px' }}>
+              <label style={{ 
+                display: 'block', 
+                color: '#374151', 
+                fontSize: '14px', 
+                fontWeight: '500', 
+                marginBottom: '8px' 
+              }}>
+                Attach Supporting Document (Optional)
+              </label>
+              {attachedFileName && attachedFileUrl && !uploadingFile ? (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  padding: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  backgroundColor: '#f9fafb'
+                }}>
+                  <span style={{ flex: 1, fontSize: '14px', color: '#374151' }}>
+                    📄 {attachedFileName}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttachedFileUrl('');
+                      setAttachedFileName('');
+                    }}
+                    style={{
+                      marginLeft: '10px',
+                      padding: '4px 8px',
+                      fontSize: '12px',
+                      color: '#ef4444',
+                      backgroundColor: 'transparent',
+                      border: '1px solid #ef4444',
+                      borderRadius: '4px',
+                      cursor: 'pointer'
+                    }}
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : uploadingFile ? (
+                <div style={{
+                  padding: '10px',
+                  border: '1px solid #d1d5db',
+                  borderRadius: '8px',
+                  backgroundColor: '#f9fafb',
+                  color: '#6b7280',
+                  fontSize: '14px'
+                }}>
+                  📤 Uploading...
+                </div>
+              ) : (
+                <input
+                  type="file"
+                  accept=".pdf,.jpg,.jpeg,.png,.doc,.docx"
+                  onChange={(e) => handleRejectionFileUpload(e.target.files?.[0] || null)}
+                  disabled={uploadingFile}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    border: '1px solid #d1d5db',
+                    borderRadius: '8px',
+                    fontSize: '14px',
+                    cursor: uploadingFile ? 'not-allowed' : 'pointer'
+                  }}
+                />
+              )}
+              <p style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                Upload supporting documents like corrected certificates or verification reports
+              </p>
+            </div>
+
             <div style={{ display: 'flex', gap: '12px', justifyContent: 'flex-end' }}>
               <button
                 onClick={() => {
                   setRejectModalOpen(false);
                   setSelectedDocument(null);
                   setRejectComments('');
+                  setAttachedFileUrl('');
+                  setAttachedFileName('');
                 }}
                 style={{
                   padding: '10px 20px',

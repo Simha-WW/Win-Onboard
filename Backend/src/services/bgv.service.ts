@@ -3,6 +3,8 @@
  * Handles document submissions, file uploads, and verification workflow
  */
 
+import mssql from 'mssql';
+import { getMSSQLPool } from '../config/database';
 import { blobStorage } from './blob.service';
 
 interface BGVSubmission {
@@ -190,6 +192,7 @@ export class BGVService {
                     fresher_id INT NOT NULL,
                     submission_status NVARCHAR(20) DEFAULT 'draft' CHECK (submission_status IN ('draft', 'submitted', 'in_review', 'verified', 'rejected')),
                     current_section NVARCHAR(50) DEFAULT 'demographics',
+                    signature_url NVARCHAR(500),
                     submitted_at DATETIME2,
                     reviewed_at DATETIME2,
                     reviewed_by NVARCHAR(100),
@@ -202,6 +205,13 @@ export class BGVService {
             ELSE
             BEGIN
                 PRINT 'bgv_submissions table already exists';
+                -- Add signature_url column if it doesn't exist
+                IF NOT EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS 
+                    WHERE TABLE_NAME = 'bgv_submissions' AND COLUMN_NAME = 'signature_url')
+                BEGIN
+                    ALTER TABLE bgv_submissions ADD signature_url NVARCHAR(500);
+                    PRINT 'Added signature_url column to bgv_submissions table';
+                END
             END
           `
         },
@@ -1973,6 +1983,518 @@ export class BGVService {
       };
     } catch (error) {
       console.error('Error fetching BGV submission data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save employment history with file uploads to blob storage
+   */
+  static async saveEmploymentHistory(submissionId: number, employmentData: any[]): Promise<void> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      console.log('💼 Saving employment history, count:', employmentData.length);
+
+      // Get fresher_id from submission
+      const submissionResult = await pool.request()
+        .input('submissionId', mssql.Int, submissionId)
+        .query('SELECT fresher_id FROM bgv_submissions WHERE id = @submissionId');
+      
+      if (!submissionResult.recordset || submissionResult.recordset.length === 0) {
+        throw new Error('Submission not found');
+      }
+      
+      const fresherId = submissionResult.recordset[0].fresher_id;
+      console.log('👤 Fresher ID:', fresherId);
+
+      // Delete existing employment records for this fresher
+      await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('DELETE FROM employment_history WHERE fresher_id = @fresherId');
+      
+      console.log('🗑️ Cleared existing employment records');
+
+      // Process each employment record
+      for (let i = 0; i < employmentData.length; i++) {
+        const emp = employmentData[i];
+        console.log(`\n📝 Processing employment record ${i + 1}/${employmentData.length}:`, {
+          company: emp.company_name,
+          designation: emp.designation,
+          hasOfferLetter: !!emp.offer_letter_file,
+          hasExpLetter: !!emp.experience_letter_file,
+          hasPayslips: !!emp.payslips_file
+        });
+
+        let offerLetterUrl = null;
+        let experienceLetterUrl = null;
+        let payslipsUrl = null;
+
+        // Upload offer letter if provided
+        if (emp.offer_letter_file && emp.offer_letter_file_name) {
+          console.log('📤 Uploading offer letter:', emp.offer_letter_file_name);
+          try {
+            const buffer = convertFileDataToBuffer(emp.offer_letter_file);
+            if (buffer && blobStorage.isConfigured()) {
+              const result = await blobStorage.uploadDocument(
+                buffer,
+                emp.offer_letter_file_name,
+                emp.offer_letter_file.type || 'application/pdf',
+                fresherId,
+                'offer-letter'
+              );
+              offerLetterUrl = result.blobUrl;
+              console.log('✅ Offer letter uploaded:', offerLetterUrl);
+            }
+          } catch (error) {
+            console.error('❌ Failed to upload offer letter:', error);
+          }
+        }
+
+        // Upload experience letter if provided
+        if (emp.experience_letter_file && emp.experience_letter_file_name) {
+          console.log('📤 Uploading experience letter:', emp.experience_letter_file_name);
+          try {
+            const buffer = convertFileDataToBuffer(emp.experience_letter_file);
+            if (buffer && blobStorage.isConfigured()) {
+              const result = await blobStorage.uploadDocument(
+                buffer,
+                emp.experience_letter_file_name,
+                emp.experience_letter_file.type || 'application/pdf',
+                fresherId,
+                'experience-letter'
+              );
+              experienceLetterUrl = result.blobUrl;
+              console.log('✅ Experience letter uploaded:', experienceLetterUrl);
+            }
+          } catch (error) {
+            console.error('❌ Failed to upload experience letter:', error);
+          }
+        }
+
+        // Upload payslips if provided
+        if (emp.payslips_file && emp.payslips_file_name) {
+          console.log('📤 Uploading payslips:', emp.payslips_file_name);
+          try {
+            const buffer = convertFileDataToBuffer(emp.payslips_file);
+            if (buffer && blobStorage.isConfigured()) {
+              const result = await blobStorage.uploadDocument(
+                buffer,
+                emp.payslips_file_name,
+                emp.payslips_file.type || 'application/pdf',
+                fresherId,
+                'payslips'
+              );
+              payslipsUrl = result.blobUrl;
+              console.log('✅ Payslips uploaded:', payslipsUrl);
+            }
+          } catch (error) {
+            console.error('❌ Failed to upload payslips:', error);
+          }
+        }
+
+        // Insert employment record with uploaded URLs
+        await pool.request()
+          .input('fresherId', mssql.Int, fresherId)
+          .input('companyName', mssql.NVarChar, emp.company_name)
+          .input('designation', mssql.NVarChar, emp.designation)
+          .input('employmentStartDate', mssql.Date, emp.employment_start_date)
+          .input('employmentEndDate', mssql.Date, emp.employment_end_date)
+          .input('reasonForLeaving', mssql.NVarChar, emp.reason_for_leaving || null)
+          .input('offerLetterUrl', mssql.NVarChar, offerLetterUrl)
+          .input('experienceLetterUrl', mssql.NVarChar, experienceLetterUrl)
+          .input('payslipsUrl', mssql.NVarChar, payslipsUrl)
+          .query(`
+            INSERT INTO employment_history (
+              fresher_id, company_name, designation, 
+              employment_start_date, employment_end_date, 
+              reason_for_leaving, offer_letter_url, 
+              experience_letter_url, payslips_url,
+              created_at, updated_at
+            ) VALUES (
+              @fresherId, @companyName, @designation,
+              @employmentStartDate, @employmentEndDate,
+              @reasonForLeaving, @offerLetterUrl,
+              @experienceLetterUrl, @payslipsUrl,
+              GETUTCDATE(), GETUTCDATE()
+            )
+          `);
+        
+        console.log(`✅ Employment record ${i + 1} saved with URLs:`, {
+          offerLetterUrl: offerLetterUrl ? 'YES' : 'NO',
+          experienceLetterUrl: experienceLetterUrl ? 'YES' : 'NO',
+          payslipsUrl: payslipsUrl ? 'YES' : 'NO'
+        });
+      }
+
+      console.log('✅ All employment records saved successfully');
+    } catch (error) {
+      console.error('❌ Error saving employment history:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save passport and visa information with file uploads
+   */
+  static async savePassportVisa(submissionId: number, passportData: any): Promise<void> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      console.log('🛂 Saving passport/visa information');
+
+      // Get fresher_id from submission
+      const submissionResult = await pool.request()
+        .input('submissionId', mssql.Int, submissionId)
+        .query('SELECT fresher_id FROM bgv_submissions WHERE id = @submissionId');
+      
+      if (!submissionResult.recordset || submissionResult.recordset.length === 0) {
+        throw new Error('Submission not found');
+      }
+      
+      const fresherId = submissionResult.recordset[0].fresher_id;
+      console.log('👤 Fresher ID:', fresherId);
+
+      let passportCopyUrl = null;
+      let visaDocumentUrl = null;
+
+      // Upload passport copy if provided
+      if (passportData.passport_copy_file && passportData.passport_copy_file_name) {
+        console.log('📤 Uploading passport copy:', passportData.passport_copy_file_name);
+        try {
+          const buffer = convertFileDataToBuffer(passportData.passport_copy_file);
+          if (buffer && blobStorage.isConfigured()) {
+            const result = await blobStorage.uploadDocument(
+              buffer,
+              passportData.passport_copy_file_name,
+              'application/pdf',
+              fresherId,
+              'passport-copy'
+            );
+            passportCopyUrl = result.blobUrl;
+            console.log('✅ Passport copy uploaded:', passportCopyUrl);
+          }
+        } catch (error) {
+          console.error('❌ Failed to upload passport copy:', error);
+        }
+      }
+
+      // Upload visa document if provided
+      if (passportData.visa_document_file && passportData.visa_document_file_name) {
+        console.log('📤 Uploading visa document:', passportData.visa_document_file_name);
+        try {
+          const buffer = convertFileDataToBuffer(passportData.visa_document_file);
+          if (buffer && blobStorage.isConfigured()) {
+            const result = await blobStorage.uploadDocument(
+              buffer,
+              passportData.visa_document_file_name,
+              'application/pdf',
+              fresherId,
+              'visa-document'
+            );
+            visaDocumentUrl = result.blobUrl;
+            console.log('✅ Visa document uploaded:', visaDocumentUrl);
+          }
+        } catch (error) {
+          console.error('❌ Failed to upload visa document:', error);
+        }
+      }
+
+      // Check if record exists
+      const existingResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('SELECT id FROM passport_visa WHERE fresher_id = @fresherId');
+
+      if (existingResult.recordset && existingResult.recordset.length > 0) {
+        // Update existing record
+        console.log('📝 Updating existing passport/visa record');
+        await pool.request()
+          .input('fresherId', mssql.Int, fresherId)
+          .input('hasPassport', mssql.Bit, passportData.has_passport || false)
+          .input('passportNumber', mssql.NVarChar, passportData.passport_number || null)
+          .input('passportIssueDate', mssql.Date, passportData.passport_issue_date || null)
+          .input('passportExpiryDate', mssql.Date, passportData.passport_expiry_date || null)
+          .input('passportCopyUrl', mssql.NVarChar, passportCopyUrl)
+          .input('hasVisa', mssql.Bit, passportData.has_visa || false)
+          .input('visaType', mssql.NVarChar, passportData.visa_type || null)
+          .input('visaExpiryDate', mssql.Date, passportData.visa_expiry_date || null)
+          .input('visaDocumentUrl', mssql.NVarChar, visaDocumentUrl)
+          .query(`
+            UPDATE passport_visa SET
+              has_passport = @hasPassport,
+              passport_number = @passportNumber,
+              passport_issue_date = @passportIssueDate,
+              passport_expiry_date = @passportExpiryDate,
+              passport_copy_url = COALESCE(@passportCopyUrl, passport_copy_url),
+              has_visa = @hasVisa,
+              visa_type = @visaType,
+              visa_expiry_date = @visaExpiryDate,
+              visa_document_url = COALESCE(@visaDocumentUrl, visa_document_url),
+              updated_at = GETUTCDATE()
+            WHERE fresher_id = @fresherId
+          `);
+      } else {
+        // Insert new record
+        console.log('📝 Inserting new passport/visa record');
+        await pool.request()
+          .input('fresherId', mssql.Int, fresherId)
+          .input('hasPassport', mssql.Bit, passportData.has_passport || false)
+          .input('passportNumber', mssql.NVarChar, passportData.passport_number || null)
+          .input('passportIssueDate', mssql.Date, passportData.passport_issue_date || null)
+          .input('passportExpiryDate', mssql.Date, passportData.passport_expiry_date || null)
+          .input('passportCopyUrl', mssql.NVarChar, passportCopyUrl)
+          .input('hasVisa', mssql.Bit, passportData.has_visa || false)
+          .input('visaType', mssql.NVarChar, passportData.visa_type || null)
+          .input('visaExpiryDate', mssql.Date, passportData.visa_expiry_date || null)
+          .input('visaDocumentUrl', mssql.NVarChar, visaDocumentUrl)
+          .query(`
+            INSERT INTO passport_visa (
+              fresher_id, has_passport, passport_number, passport_issue_date, 
+              passport_expiry_date, passport_copy_url, has_visa, visa_type,
+              visa_expiry_date, visa_document_url, created_at, updated_at
+            ) VALUES (
+              @fresherId, @hasPassport, @passportNumber, @passportIssueDate,
+              @passportExpiryDate, @passportCopyUrl, @hasVisa, @visaType,
+              @visaExpiryDate, @visaDocumentUrl, GETUTCDATE(), GETUTCDATE()
+            )
+          `);
+      }
+
+      console.log('✅ Passport/visa information saved with URLs:', {
+        passportCopyUrl: passportCopyUrl ? 'YES' : 'NO',
+        visaDocumentUrl: visaDocumentUrl ? 'YES' : 'NO'
+      });
+    } catch (error) {
+      console.error('❌ Error saving passport/visa information:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Save bank, PF, and NPS information with file uploads
+   */
+  static async saveBankPfNps(submissionId: number, bankingData: any): Promise<void> {
+    try {
+      const { getMSSQLPool } = await import('../config/database');
+      const pool = getMSSQLPool();
+      const mssql = await import('mssql');
+
+      console.log('🏦 Saving bank/PF/NPS information');
+
+      // Get fresher_id from submission
+      const submissionResult = await pool.request()
+        .input('submissionId', mssql.Int, submissionId)
+        .query('SELECT fresher_id FROM bgv_submissions WHERE id = @submissionId');
+      
+      if (!submissionResult.recordset || submissionResult.recordset.length === 0) {
+        throw new Error('Submission not found');
+      }
+      
+      const fresherId = submissionResult.recordset[0].fresher_id;
+      console.log('👤 Fresher ID:', fresherId);
+
+      let cancelledChequeUrl = null;
+
+      // Upload cancelled cheque if provided
+      if (bankingData.cancelled_cheque_file && bankingData.cancelled_cheque_file_name) {
+        console.log('📤 Uploading cancelled cheque:', bankingData.cancelled_cheque_file_name);
+        try {
+          const buffer = convertFileDataToBuffer(bankingData.cancelled_cheque_file);
+          if (buffer && blobStorage.isConfigured()) {
+            const result = await blobStorage.uploadDocument(
+              buffer,
+              bankingData.cancelled_cheque_file_name,
+              'application/pdf',
+              fresherId,
+              'cancelled-cheque'
+            );
+            cancelledChequeUrl = result.blobUrl;
+            console.log('✅ Cancelled cheque uploaded:', cancelledChequeUrl);
+          }
+        } catch (error) {
+          console.error('❌ Failed to upload cancelled cheque:', error);
+        }
+      }
+
+      // Check if record exists
+      const existingResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('SELECT id FROM bank_pf_nps WHERE fresher_id = @fresherId');
+
+      if (existingResult.recordset && existingResult.recordset.length > 0) {
+        // Update existing record
+        console.log('📝 Updating existing bank/PF/NPS record');
+        await pool.request()
+          .input('fresherId', mssql.Int, fresherId)
+          .input('bankName', mssql.NVarChar, bankingData.bank_name || null)
+          .input('branch', mssql.NVarChar, bankingData.branch || null)
+          .input('bankAccountNumber', mssql.NVarChar, bankingData.bank_account_number || null)
+          .input('ifscCode', mssql.NVarChar, bankingData.ifsc_code || null)
+          .input('nameAsPerBank', mssql.NVarChar, bankingData.name_as_per_bank || null)
+          .input('cancelledChequeUrl', mssql.NVarChar, cancelledChequeUrl)
+          .input('uanPfNumber', mssql.NVarChar, bankingData.uan_pf_number || null)
+          .input('pranNpsNumber', mssql.NVarChar, bankingData.pran_nps_number || null)
+          .query(`
+            UPDATE bank_pf_nps SET
+              bank_name = @bankName,
+              branch = @branch,
+              bank_account_number = @bankAccountNumber,
+              ifsc_code = @ifscCode,
+              name_as_per_bank = @nameAsPerBank,
+              cancelled_cheque_url = COALESCE(@cancelledChequeUrl, cancelled_cheque_url),
+              uan_pf_number = @uanPfNumber,
+              pran_nps_number = @pranNpsNumber,
+              updated_at = GETUTCDATE()
+            WHERE fresher_id = @fresherId
+          `);
+      } else {
+        // Insert new record
+        console.log('📝 Inserting new bank/PF/NPS record');
+        await pool.request()
+          .input('fresherId', mssql.Int, fresherId)
+          .input('bankName', mssql.NVarChar, bankingData.bank_name || null)
+          .input('branch', mssql.NVarChar, bankingData.branch || null)
+          .input('bankAccountNumber', mssql.NVarChar, bankingData.bank_account_number || null)
+          .input('ifscCode', mssql.NVarChar, bankingData.ifsc_code || null)
+          .input('nameAsPerBank', mssql.NVarChar, bankingData.name_as_per_bank || null)
+          .input('cancelledChequeUrl', mssql.NVarChar, cancelledChequeUrl)
+          .input('uanPfNumber', mssql.NVarChar, bankingData.uan_pf_number || null)
+          .input('pranNpsNumber', mssql.NVarChar, bankingData.pran_nps_number || null)
+          .query(`
+            INSERT INTO bank_pf_nps (
+              fresher_id, bank_name, branch, bank_account_number,
+              ifsc_code, name_as_per_bank, cancelled_cheque_url,
+              uan_pf_number, pran_nps_number, created_at, updated_at
+            ) VALUES (
+              @fresherId, @bankName, @branch, @bankAccountNumber,
+              @ifscCode, @nameAsPerBank, @cancelledChequeUrl,
+              @uanPfNumber, @pranNpsNumber, GETUTCDATE(), GETUTCDATE()
+            )
+          `);
+      }
+
+      console.log('✅ Bank/PF/NPS information saved with URL:', {
+        cancelledChequeUrl: cancelledChequeUrl ? 'YES' : 'NO'
+      });
+    } catch (error) {
+      console.error('❌ Error saving bank/PF/NPS information:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Get all BGV submission data for review
+   */
+  static async getSubmissionData(fresherId: number) {
+    try {
+      const pool = getMSSQLPool();
+      
+      // Verify fresher exists
+      const fresherResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('SELECT id FROM freshers WHERE id = @fresherId');
+      
+      if (!fresherResult.recordset || fresherResult.recordset.length === 0) {
+        throw new Error('Fresher not found');
+      }
+
+      // Fetch all data
+      const [demographics, personal, employment, education, passportVisa, bankPfNps] = await Promise.all([
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM bgv_demographics WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM bgv_personal WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM employment_history WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM educational_details WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM passport_visa WHERE fresher_id = @id'),
+        pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM bank_pf_nps WHERE fresher_id = @id')
+      ]);
+
+      return {
+        savedDemographics: demographics.recordset?.[0] || null,
+        savedPersonal: personal.recordset?.[0] || null,
+        savedEmployment: employment.recordset || [],
+        savedEducation: education.recordset || [],
+        savedPassportVisa: passportVisa.recordset?.[0] || null,
+        savedBankPfNps: bankPfNps.recordset?.[0] || null
+      };
+    } catch (error) {
+      console.error('Error fetching submission data:', error);
+      throw error;
+    }
+  }
+
+  /**
+   * Final submit BGV form with signature
+   */
+  static async finalSubmit(fresherId: number, signature: string, submittedAt: string) {
+    try {
+      const pool = getMSSQLPool();
+      
+      // Verify fresher exists
+      const fresherResult = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('SELECT id FROM freshers WHERE id = @fresherId');
+      
+      if (!fresherResult.recordset || fresherResult.recordset.length === 0) {
+        throw new Error('Fresher not found');
+      }
+
+      // Upload signature to blob storage
+      let signatureUrl = '';
+      if (signature) {
+        const signatureBuffer = convertFileDataToBuffer(signature);
+        if (signatureBuffer) {
+          const result = await blobStorage.uploadDocument(
+            signatureBuffer,
+            `signature_${Date.now()}.png`,
+            'image/png',
+            fresherId,
+            'signature'
+          );
+          signatureUrl = result.blobUrl;
+        }
+      }
+
+      // Update or insert bgv_submissions record
+      const existingSubmission = await pool.request()
+        .input('fresherId', mssql.Int, fresherId)
+        .query('SELECT id FROM bgv_submissions WHERE fresher_id = @fresherId');
+
+      if (existingSubmission.recordset && existingSubmission.recordset.length > 0) {
+        await pool.request()
+          .input('fresherId', mssql.Int, fresherId)
+          .input('signatureUrl', mssql.NVarChar, signatureUrl)
+          .input('submittedAt', mssql.DateTime, submittedAt)
+          .query(`
+            UPDATE bgv_submissions SET
+              submission_status = 'submitted',
+              signature_url = @signatureUrl,
+              submitted_at = @submittedAt,
+              updated_at = GETUTCDATE()
+            WHERE fresher_id = @fresherId
+          `);
+      } else {
+        await pool.request()
+          .input('fresherId', mssql.Int, fresherId)
+          .input('signatureUrl', mssql.NVarChar, signatureUrl)
+          .input('submittedAt', mssql.DateTime, submittedAt)
+          .query(`
+            INSERT INTO bgv_submissions (
+              fresher_id, submission_status, signature_url, 
+              submitted_at, created_at, updated_at
+            ) VALUES (
+              @fresherId, 'submitted', @signatureUrl,
+              @submittedAt, GETUTCDATE(), GETUTCDATE()
+            )
+          `);
+      }
+
+      console.log('✅ BGV form submitted successfully');
+    } catch (error) {
+      console.error('Error submitting BGV form:', error);
       throw error;
     }
   }

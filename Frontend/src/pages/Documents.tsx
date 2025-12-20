@@ -4,6 +4,7 @@
  */
 
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { FiUser, FiHome, FiBook, FiBriefcase, FiCreditCard, FiUpload, FiCheck, FiArrowRight, FiArrowLeft, FiSave } from 'react-icons/fi';
 
 interface BGVSection {
@@ -40,6 +41,7 @@ const fileToBase64 = (file: File): Promise<string> => {
 export const Documents = () => {
   console.log('BGV Documents component rendering...');
   
+  const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState(0);
   const [formData, setFormData] = useState({
     demographics: {
@@ -583,6 +585,110 @@ export const Documents = () => {
     }
 
     handleInputChange('demographics', field, file);
+  };
+
+  // Handle employment file selection (store file, upload on save)
+  const handleEmploymentFileUpload = async (index: number, field: 'offer_letter_url' | 'experience_letter_url' | 'payslips_url', file: File) => {
+    try {
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+
+      if (file.size > maxSize) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+
+      if (!allowedTypes.includes(file.type)) {
+        alert('Only PDF, JPG, JPEG, PNG files are allowed');
+        return;
+      }
+
+      console.log('📎 Employment file selected:', { field, fileName: file.name, index });
+
+      // Store file in formData (will be uploaded when saving)
+      const newHistory = [...formData.employment.employmentHistory];
+      const fileKey = field.replace('_url', '_file');
+      newHistory[index][fileKey] = file;
+      newHistory[index][`${fileKey}_name`] = file.name;
+      setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+      
+      console.log(`✅ ${field} file stored, will upload on save`);
+    } catch (error) {
+      console.error(`❌ Error selecting ${field}:`, error);
+      alert(`Failed to select ${field}: ${error.message}`);
+    }
+  };
+
+  // Handle passport/visa file selection (store file, upload on save)
+  const handlePassportFileUpload = async (field: 'passport_copy_url' | 'visa_document_url', file: File) => {
+    try {
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+
+      if (file.size > maxSize) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+
+      if (!allowedTypes.includes(file.type)) {
+        alert('Only PDF, JPG, JPEG, PNG files are allowed');
+        return;
+      }
+
+      console.log('📎 Passport/visa file selected:', { field, fileName: file.name });
+
+      // Store file in formData (will be uploaded when saving)
+      const fileKey = field.replace('_url', '_file');
+      setFormData(prev => ({ 
+        ...prev, 
+        passport: { 
+          ...prev.passport, 
+          [fileKey]: file,
+          [`${fileKey}_name`]: file.name
+        } 
+      }));
+      
+      console.log(`✅ ${field} file stored, will upload on save`);
+    } catch (error) {
+      console.error(`❌ Error selecting ${field}:`, error);
+      alert(`Failed to select ${field}: ${error.message}`);
+    }
+  };
+
+  // Handle banking file selection (store file, upload on save)
+  const handleBankingFileUpload = async (field: 'cancelled_cheque_url', file: File) => {
+    try {
+      const maxSize = 5 * 1024 * 1024; // 5MB
+      const allowedTypes = ['application/pdf', 'image/jpeg', 'image/jpg', 'image/png'];
+
+      if (file.size > maxSize) {
+        alert('File size must be less than 5MB');
+        return;
+      }
+
+      if (!allowedTypes.includes(file.type)) {
+        alert('Only PDF, JPG, JPEG, PNG files are allowed');
+        return;
+      }
+
+      console.log('📎 Banking file selected:', { field, fileName: file.name });
+
+      // Store file in formData (will be uploaded when saving)
+      const fileKey = field.replace('_url', '_file');
+      setFormData(prev => ({ 
+        ...prev, 
+        banking: { 
+          ...prev.banking, 
+          [fileKey]: file,
+          [`${fileKey}_name`]: file.name
+        } 
+      }));
+      
+      console.log(`✅ ${field} file stored, will upload on save`);
+    } catch (error) {
+      console.error('❌ Error storing banking file:', error);
+      alert('Failed to store file. Please try again.');
+    }
   };
 
   const handleSectionChange = (sectionIndex: number) => {
@@ -1188,38 +1294,81 @@ export const Documents = () => {
           };
           break;
         case 'employment':
-          apiEndpoint = '/api/documents/employment-history';
-          dataToSave = {
-            employmentHistory: formData.employment.employmentHistory.map(emp => ({
-              company_name: emp.company_name,
-              designation: emp.designation,
-              employment_start_date: emp.employment_start_date,
-              employment_end_date: emp.employment_end_date,
-              reason_for_leaving: emp.reason_for_leaving || '',
-              offer_letter_url: emp.offer_letter_url || null,
-              experience_letter_url: emp.experience_letter_url || null,
-              payslips_url: emp.payslips_url || null
-            }))
-          };
+          apiEndpoint = '/api/bgv/employment';
+          
+          // Process employment history with file uploads
+          const processedEmployment = await Promise.all(
+            (formData.employment.employmentHistory || []).map(async (emp) => {
+              const processed = {
+                company_name: emp.company_name,
+                designation: emp.designation,
+                employment_start_date: emp.employment_start_date,
+                employment_end_date: emp.employment_end_date,
+                reason_for_leaving: emp.reason_for_leaving || ''
+              };
+              
+              // Convert offer letter file to base64 if present
+              if (emp.offer_letter_file) {
+                const base64Data = await fileToBase64(emp.offer_letter_file);
+                processed.offer_letter_file = base64Data;
+                processed.offer_letter_file_name = emp.offer_letter_file_name || emp.offer_letter_file.name;
+              }
+              
+              // Convert experience letter file to base64 if present
+              if (emp.experience_letter_file) {
+                const base64Data = await fileToBase64(emp.experience_letter_file);
+                processed.experience_letter_file = base64Data;
+                processed.experience_letter_file_name = emp.experience_letter_file_name || emp.experience_letter_file.name;
+              }
+              
+              // Convert payslips file to base64 if present
+              if (emp.payslips_file) {
+                const base64Data = await fileToBase64(emp.payslips_file);
+                processed.payslips_file = base64Data;
+                processed.payslips_file_name = emp.payslips_file_name || emp.payslips_file.name;
+              }
+              
+              return processed;
+            })
+          );
+          
+          dataToSave = processedEmployment;
           console.log('📤 Sending employment data:', dataToSave);
           break;
         case 'passport':
-          apiEndpoint = '/api/documents/passport-visa';
+          apiEndpoint = '/api/bgv/passport-visa';
+          
+          // Prepare passport data with file conversion
           dataToSave = {
             has_passport: formData.passport.has_passport,
             passport_number: formData.passport.has_passport ? formData.passport.passport_number : null,
             passport_issue_date: formData.passport.has_passport ? formData.passport.passport_issue_date : null,
             passport_expiry_date: formData.passport.has_passport ? formData.passport.passport_expiry_date : null,
-            passport_copy_url: formData.passport.has_passport ? formData.passport.passport_copy_url : null,
             has_visa: formData.passport.has_visa,
             visa_type: formData.passport.has_visa ? formData.passport.visa_type : null,
-            visa_expiry_date: formData.passport.has_visa ? formData.passport.visa_expiry_date : null,
-            visa_document_url: formData.passport.has_visa ? formData.passport.visa_document_url : null
+            visa_expiry_date: formData.passport.has_visa ? formData.passport.visa_expiry_date : null
           };
+          
+          // Convert passport copy file to base64 if present
+          if (formData.passport.passport_copy_file) {
+            const base64Data = await fileToBase64(formData.passport.passport_copy_file);
+            dataToSave.passport_copy_file = base64Data;
+            dataToSave.passport_copy_file_name = formData.passport.passport_copy_file_name || formData.passport.passport_copy_file.name;
+          }
+          
+          // Convert visa document file to base64 if present
+          if (formData.passport.visa_document_file) {
+            const base64Data = await fileToBase64(formData.passport.visa_document_file);
+            dataToSave.visa_document_file = base64Data;
+            dataToSave.visa_document_file_name = formData.passport.visa_document_file_name || formData.passport.visa_document_file.name;
+          }
+          
           console.log('📤 Sending passport/visa data:', dataToSave);
           break;
         case 'banking':
-          apiEndpoint = '/api/documents/bank-pf-nps';
+          apiEndpoint = '/api/bgv/bank-pf-nps';
+          
+          // Prepare banking data with file conversion
           dataToSave = {
             number_of_bank_accounts: formData.banking.number_of_bank_accounts,
             bank_account_number: formData.banking.bank_account_number,
@@ -1227,10 +1376,17 @@ export const Documents = () => {
             name_as_per_bank: formData.banking.name_as_per_bank,
             bank_name: formData.banking.bank_name,
             branch: formData.banking.branch,
-            cancelled_cheque_url: formData.banking.cancelled_cheque_url || null,
             uan_pf_number: formData.banking.uan_pf_number || null,
             pran_nps_number: formData.banking.pran_nps_number || null
           };
+          
+          // Convert cancelled cheque file to base64 if present
+          if (formData.banking.cancelled_cheque_file) {
+            const base64Data = await fileToBase64(formData.banking.cancelled_cheque_file);
+            dataToSave.cancelled_cheque_file = base64Data;
+            dataToSave.cancelled_cheque_file_name = formData.banking.cancelled_cheque_file_name || formData.banking.cancelled_cheque_file.name;
+          }
+          
           console.log('📤 Sending bank/pf/nps data:', dataToSave);
           break;
         default:
@@ -1322,9 +1478,9 @@ export const Documents = () => {
     
     await handleSave();
     
-    // If on last section, show submit confirmation instead of navigating
+    // If on last section, navigate to review and submit page
     if (isLastSection) {
-      setShowSubmitConfirm(true);
+      navigate('/dashboard/review-submit');
     } else if (activeSection < sections.length - 1) {
       setActiveSection(activeSection + 1);
     }
@@ -3078,20 +3234,16 @@ export const Documents = () => {
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
-                          // TODO: Implement file upload to blob storage
-                          const fileName = e.target.files[0].name;
-                          const newHistory = [...formData.employment.employmentHistory];
-                          newHistory[index].offer_letter_url = fileName;
-                          setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                          await handleEmploymentFileUpload(index, 'offer_letter_url', e.target.files[0]);
                         }
                       }}
                       style={{ fontSize: '12px' }}
                     />
-                    {emp.offer_letter_url && (
+                    {emp.offer_letter_file_name && (
                       <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
-                        ✓ {emp.offer_letter_url}
+                        ✓ {emp.offer_letter_file_name}
                       </div>
                     )}
                   </div>
@@ -3103,19 +3255,16 @@ export const Documents = () => {
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
-                          const fileName = e.target.files[0].name;
-                          const newHistory = [...formData.employment.employmentHistory];
-                          newHistory[index].experience_letter_url = fileName;
-                          setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                          await handleEmploymentFileUpload(index, 'experience_letter_url', e.target.files[0]);
                         }
                       }}
                       style={{ fontSize: '12px' }}
                     />
-                    {emp.experience_letter_url && (
+                    {emp.experience_letter_file_name && (
                       <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
-                        ✓ {emp.experience_letter_url}
+                        ✓ {emp.experience_letter_file_name}
                       </div>
                     )}
                   </div>
@@ -3127,19 +3276,16 @@ export const Documents = () => {
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
-                          const fileName = e.target.files[0].name;
-                          const newHistory = [...formData.employment.employmentHistory];
-                          newHistory[index].payslips_url = fileName;
-                          setFormData(prev => ({ ...prev, employment: { ...prev.employment, employmentHistory: newHistory } }));
+                          await handleEmploymentFileUpload(index, 'payslips_url', e.target.files[0]);
                         }
                       }}
                       style={{ fontSize: '12px' }}
                     />
-                    {emp.payslips_url && (
+                    {emp.payslips_file_name && (
                       <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
-                        ✓ {emp.payslips_url}
+                        ✓ {emp.payslips_file_name}
                       </div>
                     )}
                   </div>
@@ -3277,16 +3423,16 @@ export const Documents = () => {
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
-                          handleInputChange('passport', 'passport_copy_url', e.target.files[0].name);
+                          await handlePassportFileUpload('passport_copy_url', e.target.files[0]);
                         }
                       }}
                       style={{ fontSize: '12px' }}
                     />
-                    {formData.passport.passport_copy_url && (
+                    {formData.passport.passport_copy_file_name && (
                       <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
-                        ✓ {formData.passport.passport_copy_url}
+                        ✓ {formData.passport.passport_copy_file_name}
                       </div>
                     )}
                   </div>
@@ -3365,16 +3511,16 @@ export const Documents = () => {
                     <input
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
-                      onChange={(e) => {
+                      onChange={async (e) => {
                         if (e.target.files && e.target.files[0]) {
-                          handleInputChange('passport', 'visa_document_url', e.target.files[0].name);
+                          await handlePassportFileUpload('visa_document_url', e.target.files[0]);
                         }
                       }}
                       style={{ fontSize: '12px' }}
                     />
-                    {formData.passport.visa_document_url && (
+                    {formData.passport.visa_document_file_name && (
                       <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
-                        ✓ {formData.passport.visa_document_url}
+                        ✓ {formData.passport.visa_document_file_name}
                       </div>
                     )}
                   </div>
@@ -3522,16 +3668,16 @@ export const Documents = () => {
                   <input
                     type="file"
                     accept=".pdf,.jpg,.jpeg,.png"
-                    onChange={(e) => {
+                    onChange={async (e) => {
                       if (e.target.files && e.target.files[0]) {
-                        handleInputChange('banking', 'cancelled_cheque_url', e.target.files[0].name);
+                        await handleBankingFileUpload('cancelled_cheque_url', e.target.files[0]);
                       }
                     }}
                     style={{ fontSize: '12px' }}
                   />
-                  {formData.banking.cancelled_cheque_url && (
+                  {formData.banking.cancelled_cheque_file_name && (
                     <div style={{ fontSize: '12px', color: '#10b981', marginTop: '4px' }}>
-                      ✓ {formData.banking.cancelled_cheque_url}
+                      ✓ {formData.banking.cancelled_cheque_file_name}
                     </div>
                   )}
                 </div>

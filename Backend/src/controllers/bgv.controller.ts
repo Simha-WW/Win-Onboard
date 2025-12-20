@@ -5,6 +5,7 @@
 
 import { Request, Response } from 'express';
 import { BGVService } from '../services/bgv.service';
+import { blobStorage } from '../services/blob.service';
 import multer from 'multer';
 import path from 'path';
 import fs from 'fs';
@@ -53,6 +54,15 @@ const fileFilter = (req: any, file: any, cb: any) => {
 
 const upload = multer({
   storage: storage,
+  fileFilter: fileFilter,
+  limits: {
+    fileSize: 10 * 1024 * 1024 // 10MB limit
+  }
+});
+
+// Configure multer for memory storage (for blob uploads)
+export const uploadMemory = multer({
+  storage: multer.memoryStorage(),
   fileFilter: fileFilter,
   limits: {
     fileSize: 10 * 1024 * 1024 // 10MB limit
@@ -375,17 +385,91 @@ export class BGVController {
       }
 
       const submission = await BGVService.getOrCreateSubmission(userId);
-      // TODO: Implement saveEmploymentHistory in BGVService
+      const employmentData = req.body;
+      
+      console.log('💼 Saving employment history for submission:', submission.id);
+      console.log('📦 Employment data received:', JSON.stringify(employmentData, null, 2));
+      
+      await BGVService.saveEmploymentHistory(submission.id, employmentData);
       
       res.json({
         success: true,
         message: 'Employment history saved successfully'
       });
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving employment history:', error);
       res.status(500).json({ 
         success: false, 
-        message: 'Failed to save employment history' 
+        message: 'Failed to save employment history',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Save passport and visa information
+   * POST /api/bgv/passport-visa
+   */
+  async savePassportVisa(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ success: false, message: 'User not authenticated' });
+        return;
+      }
+
+      const submission = await BGVService.getOrCreateSubmission(userId);
+      const passportData = req.body;
+      
+      console.log('🛂 Saving passport/visa information for submission:', submission.id);
+      console.log('📦 Passport data received:', JSON.stringify(passportData, null, 2));
+      
+      await BGVService.savePassportVisa(submission.id, passportData);
+      
+      res.json({
+        success: true,
+        message: 'Passport and visa information saved successfully'
+      });
+    } catch (error: any) {
+      console.error('Error saving passport/visa information:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to save passport/visa information',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Save bank, PF, and NPS information
+   * POST /api/bgv/bank-pf-nps
+   */
+  async saveBankPfNps(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ success: false, message: 'User not authenticated' });
+        return;
+      }
+
+      const submission = await BGVService.getOrCreateSubmission(userId);
+      const bankingData = req.body;
+      
+      console.log('🏦 Saving bank/PF/NPS information for submission:', submission.id);
+      console.log('📦 Banking data received:', JSON.stringify(bankingData, null, 2));
+      
+      await BGVService.saveBankPfNps(submission.id, bankingData);
+      
+      res.json({
+        success: true,
+        message: 'Bank, PF, and NPS information saved successfully'
+      });
+    } catch (error: any) {
+      console.error('Error saving bank/PF/NPS information:', error);
+      res.status(500).json({ 
+        success: false, 
+        message: 'Failed to save bank/PF/NPS information',
+        error: error.message
       });
     }
   }
@@ -901,6 +985,143 @@ export class BGVController {
       res.status(500).json({
         success: false,
         message: 'Failed to send verification email'
+      });
+    }
+  }
+
+  /**
+   * Upload HR verification document
+   * POST /api/bgv/hr/upload-verification-document
+   * Body: multipart/form-data with 'file', 'documentType', 'fresherId'
+   */
+  async uploadHRVerificationDocument(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      console.log('📤 HR verification document upload request received');
+      
+      // Check if user is authenticated
+      if (!req.user || !req.user.id) {
+        res.status(401).json({
+          success: false,
+          message: 'User not authenticated'
+        });
+        return;
+      }
+
+      // Check if file exists
+      if (!req.file) {
+        res.status(400).json({
+          success: false,
+          message: 'No file uploaded'
+        });
+        return;
+      }
+
+      const { documentType, fresherId } = req.body;
+
+      if (!documentType || !fresherId) {
+        res.status(400).json({
+          success: false,
+          message: 'Missing required fields: documentType and fresherId'
+        });
+        return;
+      }
+
+      console.log('📝 Upload details:', {
+        fileName: req.file.originalname,
+        size: req.file.size,
+        documentType,
+        fresherId,
+        hrId: req.user.id
+      });
+
+      // Upload to blob storage
+      const uploadResult = await blobStorage.uploadDocument(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype,
+        parseInt(fresherId),
+        documentType
+      );
+
+      console.log('✅ Document uploaded successfully:', uploadResult.blobUrl);
+
+      res.status(200).json({
+        success: true,
+        message: 'Document uploaded successfully',
+        url: uploadResult.blobUrl,
+        blobUrl: uploadResult.blobUrl,
+        blobName: uploadResult.blobName
+      });
+
+    } catch (error: any) {
+      console.error('❌ Error uploading HR verification document:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to upload document',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Get all BGV submission data for review
+   * GET /api/bgv/submission
+   */
+  async getSubmissionData(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ success: false, message: 'User not authenticated' });
+        return;
+      }
+
+      const submissionData = await BGVService.getSubmissionData(userId);
+
+      res.json({
+        success: true,
+        ...submissionData
+      });
+    } catch (error: any) {
+      console.error('Error fetching submission data:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to fetch submission data',
+        error: error.message
+      });
+    }
+  }
+
+  /**
+   * Final BGV form submission with signature
+   * POST /api/bgv/final-submit
+   */
+  async finalSubmit(req: AuthenticatedRequest, res: Response): Promise<void> {
+    try {
+      const userId = req.user?.id;
+      if (!userId) {
+        res.status(401).json({ success: false, message: 'User not authenticated' });
+        return;
+      }
+
+      const { signature, submittedAt } = req.body;
+
+      if (!signature) {
+        res.status(400).json({ success: false, message: 'Signature is required' });
+        return;
+      }
+
+      await BGVService.finalSubmit(userId, signature, submittedAt);
+
+      res.json({
+        success: true,
+        message: 'BGV form submitted successfully'
+      });
+    } catch (error: any) {
+      console.error('Error submitting BGV form:', error);
+      res.status(500).json({
+        success: false,
+        message: 'Failed to submit BGV form',
+        error: error.message
       });
     }
   }

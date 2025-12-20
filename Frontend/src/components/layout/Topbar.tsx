@@ -160,7 +160,7 @@ export const Topbar = ({
           {/* Right Section - Semantic spacing and sizing */}
           <div className="flex items-center" style={{ gap: 'var(--spacing-md)' }}>
             {/* Upload Document Button - Enhanced semantic spacing and visual alignment */}
-            <Button 
+            {/* <Button 
               variant="primary" 
               size="md"
               leftIcon={
@@ -179,7 +179,7 @@ export const Topbar = ({
               }}
             >
               Upload Document
-            </Button>
+            </Button> */}
 
             {/* Notifications - Semantic target size */}
             <div className="relative">

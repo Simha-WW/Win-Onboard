@@ -66,7 +66,7 @@ export const getAllItTasks = async (req: Request, res: Response) => {
 export const getItTaskById = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const taskId = parseInt(id, 10);
+    const taskId = parseInt(id || '', 10);
 
     if (isNaN(taskId)) {
       return res.status(400).json({
@@ -110,7 +110,7 @@ export const getItTaskById = async (req: Request, res: Response) => {
 export const updateItTask = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const taskId = parseInt(id, 10);
+    const taskId = parseInt(id || '', 10);
 
     if (isNaN(taskId)) {
       return res.status(400).json({
@@ -152,7 +152,7 @@ export const updateItTask = async (req: Request, res: Response) => {
 export const deleteItTask = async (req: Request, res: Response) => {
   try {
     const { id } = req.params;
-    const taskId = parseInt(id, 10);
+    const taskId = parseInt(id || '', 10);
 
     if (isNaN(taskId)) {
       return res.status(400).json({
@@ -183,7 +183,7 @@ export const deleteItTask = async (req: Request, res: Response) => {
 export const getItTaskByFresherId = async (req: Request, res: Response) => {
   try {
     const { fresherId } = req.params;
-    const id = parseInt(fresherId, 10);
+    const id = parseInt(fresherId || '', 10);
 
     if (isNaN(id)) {
       return res.status(400).json({

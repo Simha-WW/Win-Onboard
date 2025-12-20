@@ -8,6 +8,7 @@ import { Shell } from './components/layout/Shell';
 import { NewHireHome } from './pages/NewHireHome';
 import { Checklist } from './pages/Checklist';
 import { Documents } from './pages/Documents';
+import { ReviewAndSubmit } from './pages/ReviewAndSubmit';
 import { Policies } from './pages/Policies';
 import { Day1Hub } from './pages/Day1Hub';
 import { Training } from './pages/Training';
@@ -64,6 +65,10 @@ export const router = createBrowserRouter([
       {
         path: 'documents',
         element: <Documents />
+      },
+      {
+        path: 'review-submit',
+        element: <ReviewAndSubmit />
       },
       {
         path: 'policies',
