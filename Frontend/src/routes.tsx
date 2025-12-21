@@ -10,7 +10,7 @@ import { Checklist } from './pages/Checklist';
 import { Documents } from './pages/Documents';
 import { ReviewAndSubmit } from './pages/ReviewAndSubmit';
 import { Policies } from './pages/Policies';
-import { Day1Hub } from './pages/Day1Hub';
+import { UserLearning } from './pages/UserLearning';
 import { Training } from './pages/Training';
 import { Notifications } from './pages/Notifications';
 import { Login } from './pages/Login';
@@ -38,6 +38,8 @@ import { ItTaskDetail } from './pages/it/ItTaskDetail';
 // L&D Portal Components
 import { LdShell } from './pages/ld/LdShell';
 import { LdDashboard } from './pages/ld/LdDashboard';
+import { LDNewEmployees } from './pages/ld/LDNewEmployees';
+import { LDEmployeeDetail } from './pages/ld/LDEmployeeDetail';
 
 /**
  * Router configuration with all application routes
@@ -83,8 +85,8 @@ export const router = createBrowserRouter([
         element: <Policies />
       },
       {
-        path: 'day1-hub',
-        element: <Day1Hub />
+        path: 'learning',
+        element: <UserLearning />
       },
       {
         path: 'training',
@@ -195,7 +197,15 @@ export const router = createBrowserRouter([
       },
       {
         path: 'new-employees',
-        element: <div style={{ padding: '2rem' }}>New Employees - Coming Soon</div>
+        element: <LDNewEmployees />
+      },
+      {
+        path: 'employee/:id',
+        element: <LDEmployeeDetail />
+      },
+      {
+        path: 'employees',
+        element: <LDNewEmployees />
       },
       {
         path: 'schedule',

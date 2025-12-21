@@ -365,10 +365,16 @@ export class ITService {
           department: fresher.department || 'Not specified'
         });
 
-        console.log('✅ L&D training notification sent successfully');
+        // Assign learning plan based on department
+        await LearningDevelopmentService.assignLearningPlan(
+          fresherId,
+          fresher.department || 'Other'
+        );
+
+        console.log('✅ L&D training notification sent and learning plan assigned successfully');
       } catch (ldError) {
         // Log L&D notification failure but don't fail the entire process
-        console.error('⚠️ L&D notification failed (non-critical):', ldError);
+        console.error('⚠️ L&D notification/assignment failed (non-critical):', ldError);
       }
       
       // Create IT task record

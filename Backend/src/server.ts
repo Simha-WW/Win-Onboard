@@ -27,6 +27,7 @@ console.log('DEBUG: SMTP_HOST =', process.env.SMTP_HOST);
 // NOW import app (which will have env vars available)
 import { app } from './app';
 import { initializeDatabases, closeDatabaseConnections } from './config/database';
+import cron from 'node-cron';
 
 /**
  * Server Configuration
@@ -71,7 +72,7 @@ async function startServer() {
     }
     
     // Start HTTP server
-    const server = app.listen(PORT, () => {
+    const server = app.listen(PORT, async () => {
       console.log(`🚀 WinOnboard Server started successfully`);
       console.log(`📍 Server running on port: ${PORT}`);
       console.log(`🌍 Environment: ${NODE_ENV}`);
@@ -86,6 +87,76 @@ async function startServer() {
         console.log(`   GET  /api/hr/freshers    - Get all freshers`);
         console.log(`   GET  /api/hr/freshers/:id - Get fresher by ID`);
         console.log(`   POST /api/hr/freshers/:id/resend-email - Resend email`);
+      }
+
+      // Initialize Learning Reminder Scheduler
+      console.log('\n⏰ Initializing learning reminder scheduler...');
+      try {
+        const { LearningReminderService } = await import('./services/learning-reminder.service');
+        const { DeadlineExpiryService } = await import('./services/deadline-expiry.service');
+        
+        // Schedule reminder job to run every 2 days at 9:00 AM
+        // Cron format: minute hour day month weekday
+        // Run at 9:00 AM every 2 days: '0 9 */2 * *'
+        const reminderSchedule = process.env.REMINDER_SCHEDULE || '0 9 */2 * *';
+        
+        cron.schedule(reminderSchedule, async () => {
+          console.log('\n⏰ Running scheduled learning reminder job...');
+          try {
+            await LearningReminderService.sendReminders();
+            console.log('✅ Reminder job completed successfully\n');
+          } catch (error) {
+            console.error('❌ Reminder job failed:', error);
+          }
+        });
+
+        console.log(`✅ Learning reminder scheduler initialized (Schedule: ${reminderSchedule})`);
+        console.log('   Reminders will be sent every 2 days at 9:00 AM');
+        
+        // Schedule deadline expiry check to run daily at 10:00 AM
+        // Cron format: '0 10 * * *' (10:00 AM every day)
+        const deadlineCheckSchedule = process.env.DEADLINE_CHECK_SCHEDULE || '0 10 * * *';
+        
+        cron.schedule(deadlineCheckSchedule, async () => {
+          console.log('\n⏰ Running scheduled deadline expiry check...');
+          try {
+            await DeadlineExpiryService.checkAndNotifyExpiredDeadlines();
+            console.log('✅ Deadline expiry check completed successfully\n');
+          } catch (error) {
+            console.error('❌ Deadline expiry check failed:', error);
+          }
+        });
+
+        console.log(`✅ Deadline expiry scheduler initialized (Schedule: ${deadlineCheckSchedule})`);
+        console.log('   Deadline checks will run daily at 10:00 AM');
+        
+        // Optional: Send reminders immediately on startup (for testing)
+        if (process.env.SEND_REMINDERS_ON_STARTUP === 'true') {
+          console.log('🔔 Sending reminders on startup (testing mode)...');
+          setTimeout(async () => {
+            try {
+              await LearningReminderService.sendReminders();
+              console.log('✅ Initial reminders sent\n');
+            } catch (error) {
+              console.error('❌ Initial reminder send failed:', error);
+            }
+          }, 5000); // Wait 5 seconds after startup
+        }
+
+        // Optional: Check expired deadlines immediately on startup (for testing)
+        if (process.env.CHECK_DEADLINES_ON_STARTUP === 'true') {
+          console.log('🔔 Checking expired deadlines on startup (testing mode)...');
+          setTimeout(async () => {
+            try {
+              await DeadlineExpiryService.checkAndNotifyExpiredDeadlines();
+              console.log('✅ Initial deadline check completed\n');
+            } catch (error) {
+              console.error('❌ Initial deadline check failed:', error);
+            }
+          }, 7000); // Wait 7 seconds after startup
+        }
+      } catch (error) {
+        console.error('⚠️ Failed to initialize reminder scheduler (non-critical):', error);
       }
     });
 

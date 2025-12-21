@@ -28,8 +28,8 @@ const navItems: NavItem[] = [
   { id: 'checklist', label: 'Checklist', path: '/dashboard/checklist', icon: FiCheckSquare },
   { id: 'documents', label: 'Documents', path: '/dashboard/documents', icon: FiFileText },
   { id: 'policies', label: 'Policies', path: '/dashboard/policies', icon: FiFolder },
-  { id: 'day1', label: 'Day-1 Hub', path: '/dashboard/day1-hub', icon: FiCalendar },
-  { id: 'training', label: 'Training', path: '/dashboard/training', icon: FiBookOpen },
+  { id: 'learning', label: 'Learning', path: '/dashboard/learning', icon: FiBookOpen },
+  { id: 'training', label: 'Training', path: '/dashboard/training', icon: FiBriefcase },
   { id: 'notifications', label: 'Notifications', path: '/dashboard/notifications', icon: FiBell, badge: 3 }
 ];
 

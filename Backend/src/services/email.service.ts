@@ -1168,6 +1168,406 @@ This is an automated notification from the employee onboarding system.
   // TODO: Add support for multiple languages
   // TODO: Implement email queue system for high volume
   // TODO: Add email analytics and open tracking
+
+  /**
+   * Send deadline expiry notification to L&D team
+   */
+  async sendDeadlineExpiryToLD(
+    ldEmail: string,
+    ldName: string,
+    fresherName: string,
+    fresherEmail: string,
+    department: string,
+    completionPercentage: number,
+    completedCount: number,
+    totalCount: number,
+    daysAllocated: number
+  ): Promise<EmailSendResult> {
+    if (!this.transporter) {
+      return {
+        success: false,
+        error: 'Email service not initialized'
+      };
+    }
+
+    try {
+      const mailOptions = {
+        from: `"WinWire HR" <${process.env.EMAIL_USER}>`,
+        to: ldEmail,
+        subject: `⏰ Learning Deadline Expired - ${fresherName}`,
+        html: this.generateDeadlineExpiryLDHTML({
+          ldName,
+          fresherName,
+          fresherEmail,
+          department,
+          completionPercentage,
+          completedCount,
+          totalCount,
+          daysAllocated
+        }),
+        text: this.generateDeadlineExpiryLDText(
+          ldName,
+          fresherName,
+          fresherEmail,
+          department,
+          completionPercentage,
+          completedCount,
+          totalCount,
+          daysAllocated
+        )
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+      
+      console.log(`✅ Deadline expiry email sent to L&D: ${ldEmail}`);
+      
+      return {
+        success: true,
+        messageId: info.messageId
+      };
+
+    } catch (error) {
+      console.error('❌ Failed to send deadline expiry email to L&D:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Send deadline expiry notification to user
+   */
+  async sendDeadlineExpiryToUser(
+    userEmail: string,
+    userName: string,
+    completionPercentage: number,
+    completedCount: number,
+    totalCount: number
+  ): Promise<EmailSendResult> {
+    if (!this.transporter) {
+      return {
+        success: false,
+        error: 'Email service not initialized'
+      };
+    }
+
+    try {
+      const mailOptions = {
+        from: `"WinWire Learning & Development" <${process.env.EMAIL_USER}>`,
+        to: userEmail,
+        subject: `⏰ Your Learning Deadline Has Expired`,
+        html: this.generateDeadlineExpiryUserHTML({
+          userName,
+          completionPercentage,
+          completedCount,
+          totalCount
+        }),
+        text: this.generateDeadlineExpiryUserText(
+          userName,
+          completionPercentage,
+          completedCount,
+          totalCount
+        )
+      };
+
+      const info = await this.transporter.sendMail(mailOptions);
+      
+      console.log(`✅ Deadline expiry email sent to user: ${userEmail}`);
+      
+      return {
+        success: true,
+        messageId: info.messageId
+      };
+
+    } catch (error) {
+      console.error('❌ Failed to send deadline expiry email to user:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
+      };
+    }
+  }
+
+  /**
+   * Generate HTML for L&D deadline expiry notification
+   */
+  private generateDeadlineExpiryLDHTML({
+    ldName,
+    fresherName,
+    fresherEmail,
+    department,
+    completionPercentage,
+    completedCount,
+    totalCount,
+    daysAllocated
+  }: {
+    ldName: string;
+    fresherName: string;
+    fresherEmail: string;
+    department: string;
+    completionPercentage: number;
+    completedCount: number;
+    totalCount: number;
+    daysAllocated: number;
+  }): string {
+    const statusColor = completionPercentage >= 80 ? '#28a745' : 
+                       completionPercentage >= 50 ? '#ffc107' : '#dc3545';
+    
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learning Deadline Expired</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
+        .container { background-color: #ffffff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #dc3545; }
+        .header h1 { color: #dc3545; margin: 0; font-size: 28px; }
+        .employee-details { background-color: #f8f9fa; border-left: 4px solid #17a2b8; padding: 20px; margin: 20px 0; }
+        .progress-section { background-color: #fff; border: 2px solid ${statusColor}; border-radius: 5px; padding: 20px; margin: 20px 0; }
+        .progress-bar-container { background-color: #e9ecef; border-radius: 10px; height: 30px; margin: 15px 0; overflow: hidden; }
+        .progress-bar { background-color: ${statusColor}; height: 100%; width: ${completionPercentage}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; transition: width 0.3s ease; }
+        .stats { display: flex; justify-content: space-around; margin: 20px 0; }
+        .stat-box { text-align: center; padding: 15px; background-color: #f8f9fa; border-radius: 5px; flex: 1; margin: 0 5px; }
+        .stat-value { font-size: 32px; font-weight: bold; color: ${statusColor}; }
+        .stat-label { font-size: 14px; color: #6c757d; }
+        .action-required { background-color: #fff3cd; border: 1px solid #ffc107; border-radius: 5px; padding: 20px; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; font-size: 14px; color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⏰ Learning Deadline Expired</h1>
+            <p>User Progress Report</p>
+        </div>
+        <p>Dear ${ldName},</p>
+        <p>This is to inform you that the learning deadline for the following employee has expired.</p>
+        <div class="employee-details">
+            <h3>Employee Information</h3>
+            <p><strong>Name:</strong> ${fresherName}</p>
+            <p><strong>Email:</strong> ${fresherEmail}</p>
+            <p><strong>Department:</strong> ${department}</p>
+            <p><strong>Time Allocated:</strong> ${daysAllocated} days</p>
+        </div>
+        <div class="progress-section">
+            <h3>Learning Progress Summary</h3>
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-value">${completionPercentage}%</div>
+                    <div class="stat-label">Completion Rate</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${completedCount}/${totalCount}</div>
+                    <div class="stat-label">Resources Completed</div>
+                </div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar">${completionPercentage}%</div>
+            </div>
+        </div>
+        <div class="action-required">
+            <h3>📋 Next Steps</h3>
+            <p><strong>Please review the employee's progress</strong> and take appropriate action:</p>
+            <ul>
+                <li>Schedule a follow-up meeting with the employee</li>
+                <li>Assess any challenges or blockers they faced</li>
+                <li>Decide on extension or additional support if needed</li>
+                <li>Update their learning plan as necessary</li>
+            </ul>
+        </div>
+        <p>This employee has been notified about the deadline expiry and that you will be contacting them.</p>
+        <div class="footer">
+            <p><strong>Best regards,</strong><br>Learning & Development System<br>WinWire Technologies</p>
+            <p style="font-size: 12px; color: #999;">This is an automated notification. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
+   * Generate plain text for L&D deadline expiry notification
+   */
+  private generateDeadlineExpiryLDText(
+    ldName: string,
+    fresherName: string,
+    fresherEmail: string,
+    department: string,
+    completionPercentage: number,
+    completedCount: number,
+    totalCount: number,
+    daysAllocated: number
+  ): string {
+    return `
+Learning Deadline Expired - User Progress Report
+
+Dear ${ldName},
+
+This is to inform you that the learning deadline for the following employee has expired.
+
+EMPLOYEE INFORMATION:
+- Name: ${fresherName}
+- Email: ${fresherEmail}
+- Department: ${department}
+- Time Allocated: ${daysAllocated} days
+
+LEARNING PROGRESS SUMMARY:
+- Completion Rate: ${completionPercentage}%
+- Resources Completed: ${completedCount} out of ${totalCount}
+
+NEXT STEPS:
+Please review the employee's progress and take appropriate action:
+• Schedule a follow-up meeting with the employee
+• Assess any challenges or blockers they faced
+• Decide on extension or additional support if needed
+• Update their learning plan as necessary
+
+This employee has been notified about the deadline expiry and that you will be contacting them.
+
+Best regards,
+Learning & Development System
+WinWire Technologies
+
+---
+This is an automated notification. Please do not reply to this email.
+    `.trim();
+  }
+
+  /**
+   * Generate HTML for user deadline expiry notification
+   */
+  private generateDeadlineExpiryUserHTML({
+    userName,
+    completionPercentage,
+    completedCount,
+    totalCount
+  }: {
+    userName: string;
+    completionPercentage: number;
+    completedCount: number;
+    totalCount: number;
+  }): string {
+    const statusColor = completionPercentage >= 80 ? '#28a745' : 
+                       completionPercentage >= 50 ? '#ffc107' : '#dc3545';
+    const statusMessage = completionPercentage >= 80 ? 'Great progress!' :
+                         completionPercentage >= 50 ? 'Keep going!' : 'Need more focus';
+    
+    return `
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Learning Deadline Expired</title>
+    <style>
+        body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background-color: #f8f9fa; }
+        .container { background-color: #ffffff; padding: 40px; border-radius: 10px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .header { text-align: center; margin-bottom: 30px; padding-bottom: 20px; border-bottom: 2px solid #17a2b8; }
+        .header h1 { color: #17a2b8; margin: 0; font-size: 28px; }
+        .progress-section { background-color: #fff; border: 2px solid ${statusColor}; border-radius: 5px; padding: 20px; margin: 20px 0; }
+        .progress-bar-container { background-color: #e9ecef; border-radius: 10px; height: 30px; margin: 15px 0; overflow: hidden; }
+        .progress-bar { background-color: ${statusColor}; height: 100%; width: ${completionPercentage}%; display: flex; align-items: center; justify-content: center; color: white; font-weight: bold; }
+        .stats { display: flex; justify-content: space-around; margin: 20px 0; }
+        .stat-box { text-align: center; padding: 15px; background-color: #f8f9fa; border-radius: 5px; flex: 1; margin: 0 5px; }
+        .stat-value { font-size: 32px; font-weight: bold; color: ${statusColor}; }
+        .stat-label { font-size: 14px; color: #6c757d; }
+        .info-box { background-color: #e7f3ff; border-left: 4px solid #17a2b8; padding: 20px; margin: 20px 0; }
+        .footer { text-align: center; margin-top: 30px; padding-top: 20px; border-top: 1px solid #dee2e6; font-size: 14px; color: #6c757d; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>⏰ Your Learning Deadline Has Expired</h1>
+        </div>
+        <p>Dear ${userName},</p>
+        <p>Your allocated time to complete the assigned learning resources has expired. Here's a summary of your progress:</p>
+        <div class="progress-section">
+            <h3>Your Progress - ${statusMessage}</h3>
+            <div class="stats">
+                <div class="stat-box">
+                    <div class="stat-value">${completionPercentage}%</div>
+                    <div class="stat-label">Completion Rate</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-value">${completedCount}/${totalCount}</div>
+                    <div class="stat-label">Resources Completed</div>
+                </div>
+            </div>
+            <div class="progress-bar-container">
+                <div class="progress-bar">${completionPercentage}%</div>
+            </div>
+        </div>
+        <div class="info-box">
+            <h3>📬 What Happens Next?</h3>
+            <p><strong>The Learning & Development team has been notified</strong> about your progress and deadline completion.</p>
+            <p>The L&D team will review your progress and get in touch with you regarding:</p>
+            <ul>
+                <li>Your learning experience and any challenges faced</li>
+                <li>Possible deadline extension or additional support</li>
+                <li>Next steps in your learning journey</li>
+                <li>Updated learning plan if needed</li>
+            </ul>
+        </div>
+        <p><strong>Important:</strong> Please continue accessing your learning resources. Your account remains active.</p>
+        <p>If you have any immediate questions or concerns, please reach out to the L&D team directly.</p>
+        <div class="footer">
+            <p><strong>Keep Learning,</strong><br>Learning & Development Team<br>WinWire Technologies</p>
+            <p style="font-size: 12px; color: #999;">This is an automated notification. Please do not reply to this email.</p>
+        </div>
+    </div>
+</body>
+</html>
+    `.trim();
+  }
+
+  /**
+   * Generate plain text for user deadline expiry notification
+   */
+  private generateDeadlineExpiryUserText(
+    userName: string,
+    completionPercentage: number,
+    completedCount: number,
+    totalCount: number
+  ): string {
+    return `
+Your Learning Deadline Has Expired
+
+Dear ${userName},
+
+Your allocated time to complete the assigned learning resources has expired. Here's a summary of your progress:
+
+YOUR PROGRESS:
+- Completion Rate: ${completionPercentage}%
+- Resources Completed: ${completedCount} out of ${totalCount}
+
+WHAT HAPPENS NEXT?
+
+The Learning & Development team has been notified about your progress and deadline completion.
+
+The L&D team will review your progress and get in touch with you regarding:
+• Your learning experience and any challenges faced
+• Possible deadline extension or additional support
+• Next steps in your learning journey
+• Updated learning plan if needed
+
+IMPORTANT: Please continue accessing your learning resources. Your account remains active.
+
+If you have any immediate questions or concerns, please reach out to the L&D team directly.
+
+Keep Learning,
+Learning & Development Team
+WinWire Technologies
+
+---
+This is an automated notification. Please do not reply to this email.
+    `.trim();
+  }
 }
 
 // Export singleton instance

@@ -13,6 +13,8 @@ import { authRoutes } from './auth.routes';
 import { bgvRoutes } from './bgv.routes';
 import blobRoutes from './blob.routes';
 import itRoutes from './it.routes';
+import ldRoutes from './ld.routes';
+import userRoutes from './user.routes';
 import { birthdaysRoutes } from './birthdays.routes';
 import { documentsRoutes } from './documents.routes';
 import { aiAgentRoutes } from '../features/ai-agent';
@@ -66,6 +68,20 @@ router.use('/blob', blobRoutes);
  * Mounted at: /api/it/*
  */
 router.use('/it', itRoutes);
+
+/**
+ * L&D Routes
+ * Learning & Development employee learning management endpoints
+ * Mounted at: /api/ld/*
+ */
+router.use('/ld', ldRoutes);
+
+/**
+ * User Routes
+ * User/Fresher-specific endpoints including learning assignments
+ * Mounted at: /api/user/*
+ */
+router.use('/user', userRoutes);
 
 /**
  * Birthdays Routes

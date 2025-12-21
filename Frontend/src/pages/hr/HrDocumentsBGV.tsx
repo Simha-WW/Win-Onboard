@@ -48,6 +48,8 @@ export const HrDocumentsBGV = () => {
   const navigate = useNavigate();
   const { submissions, loading, refreshSubmissions } = useHrBgv();
   const [filter, setFilter] = useState<string>('all');
+  const [sendingToIT, setSendingToIT] = useState(false);
+  const [sendingMessage, setSendingMessage] = useState('');
 
   const getStatusBadge = (submission: BGVSubmission) => {
     // Check vendor verification status first
@@ -174,16 +176,25 @@ export const HrDocumentsBGV = () => {
   const handleSendToIT = async (fresherId: number, e: React.MouseEvent) => {
     e.stopPropagation();
     
-    const confirmSend = window.confirm('Are you sure you want to send this candidate to IT team? This will initiate the IT onboarding process.');
+    const confirmSend = window.confirm('Are you sure you want to send this candidate to Admin? This will notify IT and L&D teams to initiate the onboarding process.');
     if (!confirmSend) return;
 
     try {
+      setSendingToIT(true);
+      setSendingMessage('Sending email to IT and L&D, please wait...');
+      
       await hrApiService.sendToIt(fresherId);
-      alert('Successfully sent to IT team!');
-      // Refresh the submissions list
-      refreshSubmissions();
+      
+      setSendingMessage('Successfully sent to IT and L&D!');
+      setTimeout(() => {
+        setSendingToIT(false);
+        refreshSubmissions();
+      }, 1500);
     } catch (error: any) {
-      alert(error.message || 'Failed to send to IT team');
+      setSendingMessage(error.message || 'Failed to send to IT team');
+      setTimeout(() => {
+        setSendingToIT(false);
+      }, 2000);
       console.error('Error sending to IT:', error);
     }
   };
@@ -538,7 +549,7 @@ export const HrDocumentsBGV = () => {
                 </div>
 
                 {/* Action Buttons */}
-                <div style={{ display: 'flex', gap: '6px', flexWrap: 'nowrap' }}>
+                <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                   {/* Download PDF Button */}
                   <button
                     style={{
@@ -569,6 +580,34 @@ export const HrDocumentsBGV = () => {
                     <FiDownload size={12} />
                     Download
                   </button>
+
+                  {/* Send to IT Button - only show if NOT sent to IT yet */}
+                  {submission.sent_to_it === 0 && (
+                    <button
+                      style={{
+                        padding: '7px 12px',
+                        backgroundColor: '#8b5cf6',
+                        color: 'white',
+                        border: 'none',
+                        borderRadius: '5px',
+                        fontSize: '12px',
+                        fontWeight: '600',
+                        cursor: 'pointer',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '4px',
+                        transition: 'background-color 0.2s',
+                        whiteSpace: 'nowrap'
+                      }}
+                      onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#7c3aed'}
+                      onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#8b5cf6'}
+                      onClick={(e) => handleSendToIT(submission.fresher_id, e)}
+                      title="Send to IT and L&D teams for onboarding"
+                    >
+                      <FiCpu size={12} /> Send to Admin
+                    </button>
+                  )}
 
                   {/* Vendor Verification Buttons - only show if sent to IT and vendor, and not yet verified/rejected */}
                   {submission.sent_to_it === 1 && 
@@ -683,6 +722,85 @@ export const HrDocumentsBGV = () => {
           })}
         </div>
       )}
+
+      {/* Loading Modal for Send to IT */}
+      {sendingToIT && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          backgroundColor: 'rgba(0, 0, 0, 0.7)',
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          zIndex: 9999
+        }}>
+          <div style={{
+            backgroundColor: 'white',
+            borderRadius: '12px',
+            padding: '40px',
+            maxWidth: '400px',
+            textAlign: 'center',
+            boxShadow: '0 20px 60px rgba(0, 0, 0, 0.3)'
+          }}>
+            {/* Spinner */}
+            {sendingMessage.includes('please wait') && (
+              <div style={{
+                width: '60px',
+                height: '60px',
+                border: '4px solid #e5e7eb',
+                borderTop: '4px solid #8b5cf6',
+                borderRadius: '50%',
+                margin: '0 auto 24px',
+                animation: 'spin 1s linear infinite'
+              }} />
+            )}
+            
+            {/* Success Icon */}
+            {sendingMessage.includes('Successfully') && (
+              <div style={{
+                width: '60px',
+                height: '60px',
+                margin: '0 auto 24px',
+                color: '#10b981'
+              }}>
+                <FiCheckCircle size={60} />
+              </div>
+            )}
+
+            {/* Error Icon */}
+            {sendingMessage.includes('Failed') && (
+              <div style={{
+                width: '60px',
+                height: '60px',
+                margin: '0 auto 24px',
+                color: '#ef4444'
+              }}>
+                <FiX size={60} />
+              </div>
+            )}
+
+            <p style={{
+              fontSize: '18px',
+              fontWeight: '600',
+              color: '#1f2937',
+              margin: 0
+            }}>
+              {sendingMessage}
+            </p>
+          </div>
+        </div>
+      )}
+
+      {/* CSS Animation for spinner */}
+      <style>{`
+        @keyframes spin {
+          0% { transform: rotate(0deg); }
+          100% { transform: rotate(360deg); }
+        }
+      `}</style>
     </div>
   );
 };
