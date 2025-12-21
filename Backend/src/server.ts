@@ -90,7 +90,6 @@ async function startServer() {
       }
 
       // Initialize Learning Reminder Scheduler
-      console.log('\n⏰ Initializing learning reminder scheduler...');
       try {
         const { LearningReminderService } = await import('./services/learning-reminder.service');
         const { DeadlineExpiryService } = await import('./services/deadline-expiry.service');
@@ -111,7 +110,6 @@ async function startServer() {
         });
 
         console.log(`✅ Learning reminder scheduler initialized (Schedule: ${reminderSchedule})`);
-        console.log('   Reminders will be sent every 2 days at 9:00 AM');
         
         // Schedule deadline expiry check to run daily at 10:00 AM
         // Cron format: '0 10 * * *' (10:00 AM every day)
@@ -128,15 +126,12 @@ async function startServer() {
         });
 
         console.log(`✅ Deadline expiry scheduler initialized (Schedule: ${deadlineCheckSchedule})`);
-        console.log('   Deadline checks will run daily at 10:00 AM');
         
         // Optional: Send reminders immediately on startup (for testing)
         if (process.env.SEND_REMINDERS_ON_STARTUP === 'true') {
-          console.log('🔔 Sending reminders on startup (testing mode)...');
           setTimeout(async () => {
             try {
               await LearningReminderService.sendReminders();
-              console.log('✅ Initial reminders sent\n');
             } catch (error) {
               console.error('❌ Initial reminder send failed:', error);
             }
@@ -145,11 +140,9 @@ async function startServer() {
 
         // Optional: Check expired deadlines immediately on startup (for testing)
         if (process.env.CHECK_DEADLINES_ON_STARTUP === 'true') {
-          console.log('🔔 Checking expired deadlines on startup (testing mode)...');
           setTimeout(async () => {
             try {
               await DeadlineExpiryService.checkAndNotifyExpiredDeadlines();
-              console.log('✅ Initial deadline check completed\n');
             } catch (error) {
               console.error('❌ Initial deadline check failed:', error);
             }

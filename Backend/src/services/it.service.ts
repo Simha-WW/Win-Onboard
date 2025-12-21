@@ -259,8 +259,8 @@ export class ITService {
 
       // Verify the setup
       const result = await pool.request().query('SELECT * FROM dbo.it_users WHERE is_active = 1');
-      console.log('📋 Active IT Team Members:');
-      console.table(result.recordset);
+      // console.log('📋 Active IT Team Members:');
+      // console.table(result.recordset);
 
     } catch (error) {
       console.error('❌ Error setting up it_users table:', error);

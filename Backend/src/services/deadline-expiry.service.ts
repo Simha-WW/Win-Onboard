@@ -23,7 +23,7 @@ export class DeadlineExpiryService {
    * Check for expired deadlines and send notifications
    */
   static async checkAndNotifyExpiredDeadlines(): Promise<void> {
-    console.log('\n🔍 Checking for expired learning deadlines...');
+    // Checking for expired learning deadlines
     
     try {
       const pool = getMSSQLPool();
@@ -59,11 +59,10 @@ export class DeadlineExpiryService {
       `;
 
       if (result.recordset.length === 0) {
-        console.log('✅ No expired deadlines found that need notifications');
         return;
       }
 
-      console.log(`📧 Found ${result.recordset.length} expired deadline(s) requiring notifications\n`);
+      console.log(`📧 Sending deadline expiry notifications to ${result.recordset.length} user(s)`);
 
       // Get L&D email (could be from env or database)
       const ldEmail = process.env.LD_EMAIL || 'ld@winwire.com';
@@ -71,15 +70,8 @@ export class DeadlineExpiryService {
 
       // Process each expired deadline
       for (const assignment of result.recordset) {
-        console.log(`\n📬 Processing notifications for: ${assignment.fresher_name}`);
-        
-        const completionPercentage = assignment.total_count > 0
-          ? Math.round((assignment.completed_count / assignment.total_count) * 100)
-          : 0;
-
         try {
           // Send email to L&D team
-          console.log(`  📤 Sending notification to L&D team...`);
           const ldResult = await emailService.sendDeadlineExpiryToLD(
             ldEmail,
             ldName,
@@ -93,12 +85,10 @@ export class DeadlineExpiryService {
           );
 
           if (!ldResult.success) {
-            console.error(`  ❌ Failed to send L&D notification: ${ldResult.error}`);
             continue; // Skip user notification if L&D notification fails
           }
 
           // Send email to user
-          console.log(`  📤 Sending notification to user...`);
           const userResult = await emailService.sendDeadlineExpiryToUser(
             assignment.fresher_email,
             assignment.fresher_name,
@@ -108,7 +98,6 @@ export class DeadlineExpiryService {
           );
 
           if (!userResult.success) {
-            console.error(`  ❌ Failed to send user notification: ${userResult.error}`);
             continue;
           }
 
@@ -121,19 +110,12 @@ export class DeadlineExpiryService {
               WHERE fresher_id = @fresherId
             `;
 
-          console.log(`  ✅ Notifications sent successfully`);
-          console.log(`     - L&D: ${ldEmail}`);
-          console.log(`     - User: ${assignment.fresher_email}`);
-          console.log(`     - Progress: ${completionPercentage}% (${assignment.completed_count}/${assignment.total_count})`);
-
         } catch (error) {
           console.error(`  ❌ Error processing notifications for ${assignment.fresher_name}:`, error);
         }
       }
 
-      console.log('\n✅ Deadline expiry notification check completed\n');
-
-    } catch (error) {
+      } catch (error) {
       console.error('❌ Error checking expired deadlines:', error);
       throw error;
     }

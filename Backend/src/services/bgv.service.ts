@@ -175,7 +175,7 @@ export class BGVService {
    */
   static async initializeBGVTables(): Promise<void> {
     try {
-      console.log('🔧 Starting BGV table initialization...');
+      // console.log('🔧 Starting BGV table initialization...');
       
       const { getMSSQLPool } = await import('../config/database');
       const pool = getMSSQLPool();
@@ -362,16 +362,16 @@ export class BGVService {
         }
       ];
       
-      console.log('📊 Executing', tableStatements.length, 'table creation statements...');
+      // console.log('📊 Executing', tableStatements.length, 'table creation statements...');
       
       for (let i = 0; i < tableStatements.length; i++) {
         const table = tableStatements[i];
         if (table) {
-          console.log(`🔨 Creating table ${table.name} (${i + 1}/${tableStatements.length})...`);
+          // console.log(`🔨 Creating table ${table.name} (${i + 1}/${tableStatements.length})...`);
           
           try {
             const result = await pool.request().query(table.sql);
-            console.log(`✅ Table ${table.name} processed successfully`);
+            // console.log(`✅ Table ${table.name} processed successfully`);
           } catch (statementError: any) {
             console.error(`❌ Error creating table ${table.name}:`, statementError.message);
             if (!statementError.message.includes('already exists')) {
@@ -382,7 +382,7 @@ export class BGVService {
       }
       
       // Verify tables were created
-      console.log('🔍 Verifying BGV tables were created...');
+      // console.log('🔍 Verifying BGV tables were created...');
       const tablesResult = await pool.request().query(`
         SELECT TABLE_NAME 
         FROM INFORMATION_SCHEMA.TABLES 
@@ -390,7 +390,7 @@ export class BGVService {
         ORDER BY TABLE_NAME
       `);
       
-      console.log('📋 Found BGV tables:', tablesResult.recordset.map(r => r.TABLE_NAME));
+      // console.log('📋 Found BGV tables:', tablesResult.recordset.map(r => r.TABLE_NAME));
       
       if (tablesResult.recordset.length > 0) {
         console.log('✅ BGV tables initialized successfully');
@@ -416,7 +416,7 @@ export class BGVService {
    */
   static async addFileStorageColumns(pool: any): Promise<void> {
     try {
-      console.log('🔧 Adding file storage columns to bgv_demographics table...');
+      // console.log('🔧 Adding file storage columns to bgv_demographics table...');
       
       const alterStatements = [
         "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('bgv_demographics') AND name = 'aadhaar_file_data') ALTER TABLE bgv_demographics ADD aadhaar_file_data VARBINARY(MAX)",
@@ -446,7 +446,7 @@ export class BGVService {
         }
       }
       
-      console.log('✅ File storage columns added to bgv_demographics table');
+      // console.log('✅ File storage columns added to bgv_demographics table');
     } catch (error) {
       console.error('❌ Error adding file storage columns:', error);
     }
@@ -991,7 +991,7 @@ export class BGVService {
 
       // Check and add num_children column
       try {
-        console.log('🔧 Checking if num_children column exists...');
+        // console.log('🔧 Checking if num_children column exists...');
         const checkNumChildren = await pool.request().query(`
           SELECT COUNT(*) as col_count 
           FROM sys.columns 
@@ -999,11 +999,11 @@ export class BGVService {
         `);
         
         if (checkNumChildren.recordset[0].col_count === 0) {
-          console.log('🔧 Adding num_children column...');
+          // console.log('🔧 Adding num_children column...');
           await pool.request().query('ALTER TABLE bgv_personal ADD num_children INT DEFAULT 0');
-          console.log('✅ num_children column added successfully');
+          // console.log('✅ num_children column added successfully');
         } else {
-          console.log('✅ num_children column already exists');
+          // console.log('✅ num_children column already exists');
         }
       } catch (error: any) {
         console.error('❌ Error adding num_children column:', error.message);
@@ -1011,7 +1011,7 @@ export class BGVService {
 
       // Check and add emergency_contacts column
       try {
-        console.log('🔧 Checking if emergency_contacts column exists...');
+        // console.log('🔧 Checking if emergency_contacts column exists...');
         const checkEmergencyContacts = await pool.request().query(`
           SELECT COUNT(*) as col_count 
           FROM sys.columns 
@@ -1019,11 +1019,11 @@ export class BGVService {
         `);
         
         if (checkEmergencyContacts.recordset[0].col_count === 0) {
-          console.log('🔧 Adding emergency_contacts column...');
+          // console.log('🔧 Adding emergency_contacts column...');
           await pool.request().query('ALTER TABLE bgv_personal ADD emergency_contacts NVARCHAR(MAX)');
-          console.log('✅ emergency_contacts column added successfully');
+          // console.log('✅ emergency_contacts column added successfully');
         } else {
-          console.log('✅ emergency_contacts column already exists');
+          // console.log('✅ emergency_contacts column already exists');
         }
       } catch (error: any) {
         console.error('❌ Error adding emergency_contacts column:', error.message);
@@ -1033,7 +1033,7 @@ export class BGVService {
       const oldColumns = ['emergency_contact_name', 'emergency_contact_phone', 'emergency_contact_relationship'];
       for (const columnName of oldColumns) {
         try {
-          console.log(`🔧 Checking if old column ${columnName} exists...`);
+          // console.log(`🔧 Checking if old column ${columnName} exists...`);
           const checkColumn = await pool.request().query(`
             SELECT COUNT(*) as col_count 
             FROM sys.columns 
@@ -1041,18 +1041,18 @@ export class BGVService {
           `);
           
           if (checkColumn.recordset[0].col_count > 0) {
-            console.log(`🔧 Dropping old column ${columnName}...`);
+            // console.log(`🔧 Dropping old column ${columnName}...`);
             await pool.request().query(`ALTER TABLE bgv_personal DROP COLUMN ${columnName}`);
-            console.log(`✅ Old column ${columnName} dropped successfully`);
+            // console.log(`✅ Old column ${columnName} dropped successfully`);
           } else {
-            console.log(`✅ Old column ${columnName} does not exist (already removed)`);
+            // console.log(`✅ Old column ${columnName} does not exist (already removed)`);
           }
         } catch (error: any) {
-          console.error(`❌ Error dropping old column ${columnName}:`, error.message);
+          // console.error(`❌ Error dropping old column ${columnName}:`, error.message);
         }
       }
       
-      console.log('✅ bgv_personal table schema update completed');
+      // console.log('✅ bgv_personal table schema update completed');
     } catch (error) {
       console.error('❌ Error updating bgv_personal table schema:', error);
     }
@@ -1262,7 +1262,7 @@ export class BGVService {
       const pool = getMSSQLPool();
 
       // Check if educational_details table exists, create if not
-      console.log('🔧 Checking if educational_details table exists...');
+      // console.log('🔧 Checking if educational_details table exists...');
       const checkTable = await pool.request().query(`
         SELECT COUNT(*) as table_count 
         FROM INFORMATION_SCHEMA.TABLES 
@@ -1270,7 +1270,7 @@ export class BGVService {
       `);
       
       if (checkTable.recordset[0].table_count === 0) {
-        console.log('🔧 Creating educational_details table...');
+        // console.log('🔧 Creating educational_details table...');
         await pool.request().query(`
           CREATE TABLE educational_details (
             id INT IDENTITY(1,1) PRIMARY KEY,
@@ -1287,9 +1287,9 @@ export class BGVService {
             CONSTRAINT FK_educational_details_fresher FOREIGN KEY (fresher_id) REFERENCES freshers(id) ON DELETE CASCADE
           )
         `);
-        console.log('✅ educational_details table created successfully');
+        // console.log('✅ educational_details table created successfully');
       } else {
-        console.log('✅ educational_details table already exists');
+        // console.log('✅ educational_details table already exists');
         
         // Migration: Check if employee_id exists and needs to be replaced with fresher_id
         try {
@@ -1300,15 +1300,15 @@ export class BGVService {
           `);
           
           if (checkEmployeeId.recordset[0].col_count > 0) {
-            console.log('🔧 Migrating from employee_id to fresher_id...');
+            // console.log('🔧 Migrating from employee_id to fresher_id...');
             
             // Drop employee_id column
             await pool.request().query('ALTER TABLE educational_details DROP COLUMN employee_id');
-            console.log('✅ Dropped employee_id column');
+            // console.log('✅ Dropped employee_id column');
             
             // Add fresher_id column
             await pool.request().query('ALTER TABLE educational_details ADD fresher_id INT NOT NULL DEFAULT 0');
-            console.log('✅ Added fresher_id column');
+            // console.log('✅ Added fresher_id column');
             
             // Add foreign key constraint
             await pool.request().query(`
@@ -1316,16 +1316,16 @@ export class BGVService {
               ADD CONSTRAINT FK_educational_details_fresher 
               FOREIGN KEY (fresher_id) REFERENCES freshers(id) ON DELETE CASCADE
             `);
-            console.log('✅ Added foreign key constraint to freshers table');
+            // console.log('✅ Added foreign key constraint to freshers table');
           } else {
-            console.log('✅ educational_details table already using fresher_id');
+            // console.log('✅ educational_details table already using fresher_id');
           }
         } catch (migrationError: any) {
           console.error('⚠️ Migration error (may be expected):', migrationError.message);
         }
       }
       
-      console.log('✅ educational_details table schema update completed');
+      // console.log('✅ educational_details table schema update completed');
     } catch (error) {
       console.error('❌ Error updating educational_details table schema:', error);
     }
@@ -1642,7 +1642,7 @@ export class BGVService {
       const pool = getMSSQLPool();
       const mssql = await import('mssql');
 
-      console.log('🔧 Creating bgv_verifications table...');
+      // console.log('🔧 Creating bgv_verifications table...');
 
       await pool.request().query(`
         IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'bgv_verifications')
@@ -1675,7 +1675,7 @@ export class BGVService {
         END
       `);
 
-      console.log('✅ bgv_verifications table ready');
+      // console.log('✅ bgv_verifications table ready');
     } catch (error) {
       console.error('Error creating bgv_verifications table:', error);
       throw error;

@@ -29,7 +29,7 @@ export class LearningReminderService {
    */
   static async sendReminders(): Promise<void> {
     try {
-      console.log('📧 Starting learning reminder job...');
+      // Starting learning reminder check
 
       const pool = getMSSQLPool();
       
@@ -75,10 +75,11 @@ export class LearningReminderService {
       const result = await pool.request().query(query);
       const users: UserLearningStatus[] = result.recordset;
 
-      console.log(`📋 Found ${users.length} users who need reminders`);
+      if (users.length > 0) {
+        console.log(`📧 Sending reminders to ${users.length} user(s)`);
+      }
 
       if (users.length === 0) {
-        console.log('✅ No reminders to send');
         return;
       }
 
