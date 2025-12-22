@@ -1125,33 +1125,4 @@ export class BGVController {
       });
     }
   }
-
-  /**
-   * Get complete submission data for PDF generation
-   * GET /api/bgv/submission-details/:fresherId
-   */
-  async getCompleteSubmissionData(req: Request, res: Response): Promise<void> {
-    try {
-      const fresherId = parseInt(req.params.fresherId);
-      
-      if (isNaN(fresherId)) {
-        res.status(400).json({ success: false, message: 'Invalid fresher ID' });
-        return;
-      }
-
-      const submissionData = await BGVService.getCompleteSubmissionData(fresherId);
-
-      res.json({
-        success: true,
-        data: submissionData
-      });
-    } catch (error: any) {
-      console.error('Error fetching complete submission data:', error);
-      res.status(500).json({
-        success: false,
-        message: 'Failed to fetch submission data',
-        error: error.message
-      });
-    }
-  }
 }

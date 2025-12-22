@@ -93,11 +93,12 @@ async function startServer() {
       try {
         const { LearningReminderService } = await import('./services/learning-reminder.service');
         const { DeadlineExpiryService } = await import('./services/deadline-expiry.service');
+        const { ProgressReportService } = await import('./services/progress-report.service');
         
-        // Schedule reminder job to run every 2 days at 9:00 AM
+        // Schedule reminder job to run weekly at 9:00 AM every Monday
         // Cron format: minute hour day month weekday
-        // Run at 9:00 AM every 2 days: '0 9 */2 * *'
-        const reminderSchedule = process.env.REMINDER_SCHEDULE || '0 9 */2 * *';
+        // Run at 9:00 AM every Monday: '0 9 * * 1'
+        const reminderSchedule = process.env.REMINDER_SCHEDULE || '0 9 * * 1';
         
         cron.schedule(reminderSchedule, async () => {
           console.log('\n⏰ Running scheduled learning reminder job...');
@@ -126,6 +127,22 @@ async function startServer() {
         });
 
         console.log(`✅ Deadline expiry scheduler initialized (Schedule: ${deadlineCheckSchedule})`);
+        
+        // Schedule 30/60/90 day progress reports to run daily at 11:00 AM
+        // Cron format: '0 11 * * *' (11:00 AM every day)
+        const progressReportSchedule = process.env.PROGRESS_REPORT_SCHEDULE || '0 11 * * *';
+        
+        cron.schedule(progressReportSchedule, async () => {
+          console.log('\n⏰ Running scheduled 30/60/90 day progress report check...');
+          try {
+            await ProgressReportService.sendProgressReports();
+            console.log('✅ Progress report check completed successfully\n');
+          } catch (error) {
+            console.error('❌ Progress report check failed:', error);
+          }
+        });
+
+        console.log(`✅ Progress report scheduler initialized (Schedule: ${progressReportSchedule})`);
         
         // Optional: Send reminders immediately on startup (for testing)
         if (process.env.SEND_REMINDERS_ON_STARTUP === 'true') {

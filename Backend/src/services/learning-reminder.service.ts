@@ -1,6 +1,6 @@
 /**
  * Learning Reminder Service
- * Sends reminder emails every 2 days to users with incomplete learning plans
+ * Sends reminder emails weekly to users with incomplete learning plans
  */
 
 import { getMSSQLPool } from '../config/database';
@@ -25,7 +25,7 @@ interface UserLearningStatus {
 export class LearningReminderService {
   /**
    * Send reminder emails to users who haven't completed their learning plans
-   * This should be called by a scheduled job every 2 days
+   * This should be called by a scheduled job weekly (every 7 days)
    */
   static async sendReminders(): Promise<void> {
     try {
@@ -60,7 +60,7 @@ export class LearningReminderService {
           AND ula.deadline > GETDATE()
           AND (
             ula.last_reminder_sent IS NULL 
-            OR DATEDIFF(DAY, ula.last_reminder_sent, GETDATE()) >= 2
+            OR DATEDIFF(DAY, ula.last_reminder_sent, GETDATE()) >= 7
           )
           AND (
             SELECT COUNT(*) 
@@ -231,15 +231,26 @@ export class LearningReminderService {
             </p>
           </div>
           
-          <!-- CTA Button -->
+          <!-- CTA Buttons -->
           <div style="text-align: center; margin: 30px 0;">
             <a href="${process.env.FRONTEND_URL}/dashboard/learning" 
                style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
                       color: white; padding: 14px 35px; text-decoration: none; border-radius: 8px; 
-                      font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+                      font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+                      margin: 0 10px;">
               📖 Continue Learning
             </a>
+            <a href="${process.env.FRONTEND_URL}/login" 
+               style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); 
+                      color: white; padding: 14px 35px; text-decoration: none; border-radius: 8px; 
+                      font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+                      margin: 0 10px;">
+              🔐 Login to Portal
+            </a>
           </div>
+          <p style="text-align: center; margin-top: 12px; font-size: 13px; color: #6b7280;">
+            Portal: <a href="${process.env.FRONTEND_URL}/login" style="color: #667eea;">${process.env.FRONTEND_URL}/login</a>
+          </p>
           
           <!-- Additional Info -->
           <div style="margin-top: 30px; padding-top: 20px; border-top: 2px solid #e5e7eb;">
@@ -276,6 +287,10 @@ export class LearningReminderService {
       </div>
     `;
 
-    await emailService.sendEmail(user.email, emailSubject, emailBody);
+    await emailService.sendEmail({
+      to: user.email,
+      subject: emailSubject,
+      html: emailBody
+    });
   }
 }

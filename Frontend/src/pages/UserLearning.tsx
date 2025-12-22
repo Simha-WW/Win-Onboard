@@ -4,7 +4,7 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { FiBook, FiCheckCircle, FiClock, FiExternalLink, FiAward, FiTrendingUp } from 'react-icons/fi';
+import { FiPlay, FiCheckCircle, FiClock, FiExternalLink, FiAward, FiBookOpen, FiBook } from 'react-icons/fi';
 import { userApiService } from '../services/userApi';
 import { LearningItem, EmployeeLearningProgress } from '../services/ldApi';
 
@@ -45,11 +45,14 @@ export const UserLearning = () => {
     }
   };
 
-  const formatDuration = (minutes: number) => {
-    if (minutes < 60) return `${minutes} min`;
-    const hours = Math.floor(minutes / 60);
-    const mins = minutes % 60;
-    return mins > 0 ? `${hours}h ${mins}m` : `${hours}h`;
+  const getStatusColor = (isCompleted: boolean) => {
+    return isCompleted ? '#10b981' : '#f59e0b';
+  };
+
+  const getStatusIcon = (isCompleted: boolean) => {
+    return isCompleted 
+      ? <FiAward style={{ color: '#10b981', width: '20px', height: '20px' }} />
+      : <FiBookOpen style={{ color: '#f59e0b', width: '20px', height: '20px' }} />;
   };
 
   if (loading) {
@@ -67,7 +70,7 @@ export const UserLearning = () => {
 
   if (error) {
     return (
-      <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
+      <div style={{ padding: '20px', backgroundColor: 'white', minHeight: '500px' }}>
         <div style={{
           padding: '16px',
           backgroundColor: '#fee2e2',
@@ -83,14 +86,9 @@ export const UserLearning = () => {
 
   if (!data || !data.learnings || data.learnings.length === 0) {
     return (
-      <div style={{ padding: '24px', maxWidth: '1200px', margin: '0 auto' }}>
-        <h1 style={{
-          fontSize: '28px',
-          fontWeight: '700',
-          color: '#1f2937',
-          margin: '0 0 24px 0'
-        }}>
-          My Learning Plan
+      <div style={{ padding: '20px', backgroundColor: 'white', minHeight: '500px' }}>
+        <h1 style={{ color: 'black', fontSize: '28px', marginBottom: '20px', fontWeight: 'bold' }}>
+          📚 My Learning Plan
         </h1>
         <div style={{
           textAlign: 'center',
@@ -130,413 +128,278 @@ export const UserLearning = () => {
   const pendingLearnings = learnings.filter(l => !l.is_completed);
 
   return (
-    <div style={{
-      padding: '24px',
-      maxWidth: '1200px',
-      margin: '0 auto'
-    }}>
-      {/* Header */}
-      <div style={{ marginBottom: '32px' }}>
-        <h1 style={{
-          fontSize: '28px',
-          fontWeight: '700',
-          color: '#1f2937',
-          margin: '0 0 8px 0'
-        }}>
-          My Learning Plan
-        </h1>
-        <p style={{
-          fontSize: '14px',
-          color: '#6b7280',
-          margin: 0
-        }}>
-          Track your progress and complete your assigned learning modules
-        </p>
-      </div>
+    <div style={{ padding: '20px', backgroundColor: 'white', minHeight: '500px' }}>
+      <h1 style={{ color: 'black', fontSize: '28px', marginBottom: '20px', fontWeight: 'bold' }}>
+        📚 My Learning Plan
+      </h1>
+      
+      <p style={{ color: '#6b7280', fontSize: '16px', marginBottom: '30px' }}>
+        Complete your assigned learning modules to enhance your skills and knowledge.
+      </p>
 
-      {/* Progress Card */}
+      {/* Overall Progress Bar */}
       <div style={{
         backgroundColor: 'white',
+        border: '1px solid #e5e7eb',
         borderRadius: '12px',
-        padding: '24px',
-        marginBottom: '24px',
-        boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-        border: '1px solid #e5e7eb'
+        padding: '20px',
+        marginBottom: '24px'
       }}>
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))',
-          gap: '24px',
-          marginBottom: '20px'
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: '12px' 
         }}>
-          <div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '8px'
-            }}>
-              <FiTrendingUp style={{ color: '#2563eb', width: '20px', height: '20px' }} />
-              <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>
-                Overall Progress
-              </span>
-            </div>
-            <div style={{ fontSize: '32px', fontWeight: '700', color: '#2563eb' }}>
-              {stats.progress_percentage}%
-            </div>
-          </div>
-
-          <div>
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '8px',
-              marginBottom: '8px'
-            }}>
-              <FiCheckCircle style={{ color: '#10b981', width: '20px', height: '20px' }} />
-              <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>
-                Completed
-              </span>
-            </div>
-            <div style={{ fontSize: '32px', fontWeight: '700', color: '#10b981' }}>
-              {stats.completed_count} / {stats.total_count}
-            </div>
-          </div>
-
-          {data.employee?.days_remaining !== undefined && data.employee?.days_remaining !== null && (
-            <div>
-              <div style={{
-                display: 'flex',
-                alignItems: 'center',
-                gap: '8px',
-                marginBottom: '8px'
-              }}>
-                <FiClock style={{ 
-                  color: data.employee.days_remaining < 3 ? '#ef4444' : data.employee.days_remaining < 7 ? '#f59e0b' : '#6b7280', 
-                  width: '20px', 
-                  height: '20px' 
-                }} />
-                <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>
-                  Time Remaining
-                </span>
-              </div>
-              <div style={{ 
-                fontSize: '32px', 
-                fontWeight: '700', 
-                color: data.employee.days_remaining < 3 ? '#ef4444' : data.employee.days_remaining < 7 ? '#f59e0b' : '#6b7280'
-              }}>
-                {data.employee.days_remaining > 0 ? `${data.employee.days_remaining}` : '0'} days
-              </div>
-              {data.employee.days_remaining < 3 && data.employee.days_remaining > 0 && (
-                <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', fontWeight: '500' }}>
-                  ⚠️ Deadline approaching!
-                </div>
-              )}
-              {data.employee.days_remaining <= 0 && (
-                <div style={{ fontSize: '12px', color: '#ef4444', marginTop: '4px', fontWeight: '500' }}>
-                  ⚠️ Deadline passed!
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Progress Bar */}
-        <div>
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            marginBottom: '8px'
+          <span style={{ fontSize: '16px', fontWeight: '600', color: '#1f2937' }}>
+            Overall Learning Progress
+          </span>
+          <span style={{ 
+            fontSize: '18px', 
+            fontWeight: '700', 
+            color: stats.progress_percentage >= 75 ? '#10b981' : stats.progress_percentage >= 50 ? '#f59e0b' : '#ef4444'
           }}>
-            <span style={{ fontSize: '14px', color: '#6b7280', fontWeight: '500' }}>
-              Learning Progress
-            </span>
-          </div>
-          <div style={{
-            height: '12px',
-            backgroundColor: '#e5e7eb',
-            borderRadius: '6px',
-            overflow: 'hidden'
-          }}>
-            <div style={{
-              height: '100%',
-              width: `${stats.progress_percentage}%`,
-              backgroundColor: stats.progress_percentage === 100 ? '#10b981' : '#2563eb',
-              transition: 'width 0.3s',
-              borderRadius: '6px'
-            }} />
-          </div>
+            {stats.progress_percentage}%
+          </span>
         </div>
-
-        {stats.progress_percentage === 100 && (
+        
+        <div style={{
+          width: '100%',
+          height: '16px',
+          backgroundColor: '#e5e7eb',
+          borderRadius: '8px',
+          overflow: 'hidden',
+          marginBottom: '12px'
+        }}>
           <div style={{
-            marginTop: '16px',
-            padding: '12px',
-            backgroundColor: '#d1fae5',
+            width: `${stats.progress_percentage}%`,
+            height: '100%',
+            background: stats.progress_percentage >= 75 
+              ? 'linear-gradient(90deg, #10b981 0%, #059669 100%)'
+              : stats.progress_percentage >= 50 
+              ? 'linear-gradient(90deg, #f59e0b 0%, #d97706 100%)'
+              : 'linear-gradient(90deg, #ef4444 0%, #dc2626 100%)',
             borderRadius: '8px',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            color: '#047857'
+            transition: 'width 0.5s ease'
+          }} />
+        </div>
+        
+        <div style={{ fontSize: '14px', color: '#6b7280' }}>
+          {stats.completed_count} of {stats.total_count} learning modules completed
+        </div>
+      </div>
+
+      {/* Progress Overview */}
+      <div style={{ 
+        display: 'grid', 
+        gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', 
+        gap: '16px',
+        marginBottom: '30px'
+      }}>
+        <div style={{ backgroundColor: '#f0fdf4', padding: '16px', borderRadius: '8px', border: '1px solid #bbf7d0' }}>
+          <div style={{ color: '#15803d', fontSize: '18px', fontWeight: 'bold' }}>
+            {stats.completed_count}/{stats.total_count}
+          </div>
+          <div style={{ color: '#16a34a', fontSize: '14px' }}>Modules Completed</div>
+        </div>
+        <div style={{ backgroundColor: '#fefce8', padding: '16px', borderRadius: '8px', border: '1px solid #fde047' }}>
+          <div style={{ color: '#ca8a04', fontSize: '18px', fontWeight: 'bold' }}>
+            {pendingLearnings.length}
+          </div>
+          <div style={{ color: '#eab308', fontSize: '14px' }}>Pending</div>
+        </div>
+        {data.employee?.days_remaining !== undefined && data.employee?.days_remaining !== null && (
+          <div style={{ 
+            backgroundColor: data.employee.days_remaining < 3 ? '#fef2f2' : '#eff6ff', 
+            padding: '16px', 
+            borderRadius: '8px', 
+            border: `1px solid ${data.employee.days_remaining < 3 ? '#fecaca' : '#bfdbfe'}`
           }}>
-            <FiAward size={20} />
-            <span style={{ fontWeight: '600' }}>
-              Congratulations! You've completed all your learning modules! 🎉
-            </span>
+            <div style={{ 
+              color: data.employee.days_remaining < 3 ? '#dc2626' : '#1d4ed8', 
+              fontSize: '18px', 
+              fontWeight: 'bold' 
+            }}>
+              {data.employee.days_remaining > 0 ? data.employee.days_remaining : 0} days
+            </div>
+            <div style={{ 
+              color: data.employee.days_remaining < 3 ? '#ef4444' : '#2563eb', 
+              fontSize: '14px' 
+            }}>
+              Time Remaining
+            </div>
           </div>
         )}
       </div>
 
-      {/* Pending Learning Items */}
-      {pendingLearnings.length > 0 && (
-        <div style={{
-          backgroundColor: 'white',
-          borderRadius: '12px',
-          padding: '24px',
-          marginBottom: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: '1px solid #e5e7eb'
-        }}>
-          <h2 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            color: '#1f2937',
-            margin: '0 0 20px 0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <FiBook /> Pending ({pendingLearnings.length})
-          </h2>
+      <h2 style={{ color: 'black', fontSize: '22px', marginBottom: '20px', fontWeight: '600' }}>
+        Learning Modules
+      </h2>
 
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
-            {pendingLearnings.map((learning, index) => (
-              <div
-                key={learning.id}
-                style={{
-                  padding: '20px',
-                  backgroundColor: '#fef9c3',
-                  border: '2px solid #fde047',
-                  borderRadius: '8px',
-                  transition: 'all 0.2s'
-                }}
-              >
+      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+        {learnings.map((module, index) => {
+          const progress = module.is_completed ? 100 : 0;
+          
+          return (
+            <div key={module.id} style={{
+              backgroundColor: 'white',
+              border: '1px solid #e5e7eb',
+              borderRadius: '12px',
+              padding: '20px',
+              transition: 'all 0.2s ease'
+            }}
+            onMouseOver={(e) => {
+              e.currentTarget.style.boxShadow = '0 4px 12px rgba(0,0,0,0.1)';
+            }}
+            onMouseOut={(e) => {
+              e.currentTarget.style.boxShadow = 'none';
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '16px', marginBottom: '12px' }}>
+                {getStatusIcon(module.is_completed)}
+                <div style={{ flex: 1 }}>
+                  <h3 style={{ fontWeight: '600', fontSize: '18px', color: 'black', marginBottom: '4px' }}>
+                    {module.learning_title}
+                  </h3>
+                  {module.completed_at && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '6px', color: '#10b981', fontSize: '12px' }}>
+                      <FiCheckCircle style={{ width: '12px', height: '12px' }} />
+                      Completed on {new Date(module.completed_at).toLocaleDateString()}
+                    </div>
+                  )}
+                </div>
                 <div style={{
-                  display: 'flex',
-                  justifyContent: 'space-between',
-                  alignItems: 'flex-start',
-                  gap: '16px',
-                  flexWrap: 'wrap'
+                  padding: '6px 12px',
+                  backgroundColor: getStatusColor(module.is_completed),
+                  color: 'white',
+                  fontSize: '12px',
+                  fontWeight: 'bold',
+                  borderRadius: '16px',
+                  textTransform: 'capitalize'
                 }}>
-                  <div style={{ flex: 1, minWidth: '250px' }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      marginBottom: '12px'
-                    }}>
-                      <span style={{
-                        fontSize: '16px',
-                        fontWeight: '700',
-                        color: '#9ca3af',
-                        minWidth: '35px'
-                      }}>
-                        #{completedLearnings.length + index + 1}
-                      </span>
-                      <h3 style={{
-                        fontSize: '18px',
-                        fontWeight: '600',
-                        color: '#1f2937',
-                        margin: 0
-                      }}>
-                        {learning.learning_title}
-                      </h3>
-                    </div>
+                  {module.is_completed ? 'Completed' : 'Pending'}
+                </div>
+              </div>
 
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '16px',
-                      marginLeft: '47px',
-                      marginTop: '12px',
-                      flexWrap: 'wrap'
-                    }}>
+              {/* Progress Bar */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{
+                  width: '100%',
+                  height: '8px',
+                  backgroundColor: '#f3f4f6',
+                  borderRadius: '4px',
+                  overflow: 'hidden'
+                }}>
+                  <div style={{
+                    width: `${progress}%`,
+                    height: '100%',
+                    backgroundColor: getStatusColor(module.is_completed),
+                    transition: 'width 0.3s ease'
+                  }} />
+                </div>
+                <div style={{ fontSize: '12px', color: '#6b7280', marginTop: '4px' }}>
+                  {progress}% Complete
+                </div>
+              </div>
 
-                      {learning.learning_link && (
-                        <a
-                          href={learning.learning_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '6px',
-                            padding: '8px 16px',
-                            backgroundColor: '#2563eb',
-                            color: 'white',
-                            textDecoration: 'none',
-                            borderRadius: '6px',
-                            fontSize: '14px',
-                            fontWeight: '600',
-                            transition: 'all 0.2s'
-                          }}
-                          onMouseEnter={(e) => e.currentTarget.style.backgroundColor = '#1d4ed8'}
-                          onMouseLeave={(e) => e.currentTarget.style.backgroundColor = '#2563eb'}
-                        >
-                          <FiExternalLink size={16} />
-                          Open Resource
-                        </a>
-                      )}
-                    </div>
-                  </div>
-
-                  <button
-                    onClick={() => handleMarkComplete(learning)}
-                    disabled={completingId === learning.id}
+              {/* Action Buttons */}
+              <div style={{ display: 'flex', gap: '12px', alignItems: 'center' }}>
+                {module.learning_link && (
+                  <a
+                    href={module.learning_link}
+                    target="_blank"
+                    rel="noopener noreferrer"
                     style={{
-                      padding: '12px 24px',
+                      backgroundColor: '#2563eb',
+                      color: 'white',
+                      border: 'none',
+                      borderRadius: '8px',
+                      padding: '10px 20px',
+                      fontSize: '14px',
+                      fontWeight: '600',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      textDecoration: 'none'
+                    }}
+                  >
+                    <FiExternalLink style={{ width: '16px', height: '16px' }} />
+                    Open Resource
+                  </a>
+                )}
+                {!module.is_completed && (
+                  <button 
+                    onClick={() => handleMarkComplete(module)}
+                    disabled={completingId === module.id}
+                    style={{
                       backgroundColor: '#10b981',
                       color: 'white',
                       border: 'none',
                       borderRadius: '8px',
-                      fontSize: '16px',
+                      padding: '10px 20px',
+                      fontSize: '14px',
                       fontWeight: '600',
-                      cursor: completingId === learning.id ? 'not-allowed' : 'pointer',
+                      cursor: completingId === module.id ? 'not-allowed' : 'pointer',
                       display: 'flex',
                       alignItems: 'center',
                       gap: '8px',
-                      opacity: completingId === learning.id ? 0.5 : 1,
-                      transition: 'all 0.2s',
-                      whiteSpace: 'nowrap'
-                    }}
-                    onMouseEnter={(e) => {
-                      if (completingId !== learning.id) {
-                        e.currentTarget.style.backgroundColor = '#059669';
-                        e.currentTarget.style.transform = 'scale(1.05)';
-                      }
-                    }}
-                    onMouseLeave={(e) => {
-                      if (completingId !== learning.id) {
-                        e.currentTarget.style.backgroundColor = '#10b981';
-                        e.currentTarget.style.transform = 'scale(1)';
-                      }
+                      opacity: completingId === module.id ? 0.5 : 1
                     }}
                   >
-                    {completingId === learning.id ? (
+                    {completingId === module.id ? (
                       'Marking...'
                     ) : (
-                      <><FiCheckCircle size={20} /> Mark as Complete</>
+                      <>
+                        <FiCheckCircle style={{ width: '16px', height: '16px' }} />
+                        Mark as Complete
+                      </>
                     )}
                   </button>
-                </div>
+                )}
+                {module.is_completed && (
+                  <button style={{
+                    backgroundColor: '#10b981',
+                    color: 'white',
+                    border: 'none',
+                    borderRadius: '8px',
+                    padding: '10px 20px',
+                    fontSize: '14px',
+                    fontWeight: '600',
+                    cursor: 'pointer',
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '8px'
+                  }}>
+                    <FiAward style={{ width: '16px', height: '16px' }} />
+                    Review
+                  </button>
+                )}
               </div>
-            ))}
-          </div>
-        </div>
-      )}
+            </div>
+          );
+        })}
+      </div>
 
-      {/* Completed Learning Items */}
-      {completedLearnings.length > 0 && (
+      {/* Completion Message */}
+      {stats.progress_percentage === 100 && (
         <div style={{
-          backgroundColor: 'white',
+          marginTop: '30px',
+          padding: '20px',
+          backgroundColor: '#d1fae5',
           borderRadius: '12px',
-          padding: '24px',
-          boxShadow: '0 1px 3px rgba(0, 0, 0, 0.1)',
-          border: '1px solid #e5e7eb'
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          border: '2px solid #86efac'
         }}>
-          <h2 style={{
-            fontSize: '20px',
-            fontWeight: '600',
-            color: '#1f2937',
-            margin: '0 0 20px 0',
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px'
-          }}>
-            <FiCheckCircle style={{ color: '#10b981' }} /> Completed ({completedLearnings.length})
-          </h2>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
-            {completedLearnings.map((learning, index) => (
-              <div
-                key={learning.id}
-                style={{
-                  padding: '16px',
-                  backgroundColor: '#f0fdf4',
-                  border: '2px solid #86efac',
-                  borderRadius: '8px',
-                  opacity: 0.9
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'flex-start',
-                  gap: '12px'
-                }}>
-                  <FiCheckCircle style={{
-                    color: '#10b981',
-                    width: '24px',
-                    height: '24px',
-                    flexShrink: 0,
-                    marginTop: '2px'
-                  }} />
-                  <div style={{ flex: 1 }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '8px',
-                      marginBottom: '4px'
-                    }}>
-                      <span style={{
-                        fontSize: '14px',
-                        fontWeight: '700',
-                        color: '#9ca3af'
-                      }}>
-                        #{index + 1}
-                      </span>
-                      <h3 style={{
-                        fontSize: '16px',
-                        fontWeight: '600',
-                        color: '#1f2937',
-                        margin: 0
-                      }}>
-                        {learning.learning_title}
-                      </h3>
-                    </div>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '12px',
-                      fontSize: '12px',
-                      marginTop: '12px',
-                      color: '#9ca3af'
-                    }}>
-                      {learning.completed_at && (
-                        <span style={{ color: '#10b981', fontWeight: '500' }}>
-                          ✓ Completed on {new Date(learning.completed_at).toLocaleDateString()}
-                        </span>
-                      )}
-                      {learning.learning_link && (
-                        <a
-                          href={learning.learning_link}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            gap: '4px',
-                            color: '#2563eb',
-                            textDecoration: 'none'
-                          }}
-                        >
-                          <FiExternalLink size={12} /> View Resource
-                        </a>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            ))}
+          <FiAward style={{ width: '32px', height: '32px', color: '#047857' }} />
+          <div>
+            <h3 style={{ margin: 0, color: '#047857', fontSize: '18px', fontWeight: '700' }}>
+              Congratulations! 🎉
+            </h3>
+            <p style={{ margin: '4px 0 0 0', color: '#059669', fontSize: '14px' }}>
+              You've completed all your assigned learning modules!
+            </p>
           </div>
         </div>
       )}

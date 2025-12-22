@@ -17,6 +17,7 @@ import ldRoutes from './ld.routes';
 import userRoutes from './user.routes';
 import { birthdaysRoutes } from './birthdays.routes';
 import { documentsRoutes } from './documents.routes';
+import policiesRoutes from './policies.routes';
 import { aiAgentRoutes } from '../features/ai-agent';
 
 const router = Router();
@@ -96,6 +97,13 @@ router.use('/birthdays', birthdaysRoutes);
  * Mounted at: /api/documents/*
  */
 router.use('/documents', documentsRoutes);
+
+/**
+ * Policies Routes
+ * Company policy documents from blob storage
+ * Mounted at: /api/policies/*
+ */
+router.use('/policies', policiesRoutes);
 
 /**
  * AI Agent Feature Routes

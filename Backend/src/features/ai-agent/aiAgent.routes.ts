@@ -25,7 +25,7 @@ router.post('/chat', async (req: Request, res: Response, next: NextFunction) => 
         message: 'AI Agent service is not configured'
       });
     }
-
+ 
     const { message, userId } = req.body;
     
     if (!message) {

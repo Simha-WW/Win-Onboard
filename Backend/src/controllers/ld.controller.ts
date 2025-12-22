@@ -33,7 +33,7 @@ export const getLDEmployees = async (req: Request, res: Response) => {
  */
 export const getEmployeeLearningProgress = async (req: Request, res: Response) => {
   try {
-    const fresherId = parseInt(req.params.id);
+    const fresherId = parseInt(req.params.id || '');
     
     if (isNaN(fresherId)) {
       return res.status(400).json({
@@ -63,8 +63,8 @@ export const getEmployeeLearningProgress = async (req: Request, res: Response) =
  */
 export const updateEmployeeLearningProgress = async (req: Request, res: Response) => {
   try {
-    const fresherId = parseInt(req.params.fresherId);
-    const progressId = parseInt(req.params.progressId);
+    const fresherId = parseInt(req.params.fresherId || '');
+    const progressId = parseInt(req.params.progressId || '');
     const { isCompleted, progressPercentage, notes } = req.body;
 
     if (isNaN(fresherId) || isNaN(progressId)) {
@@ -103,7 +103,7 @@ export const updateEmployeeLearningProgress = async (req: Request, res: Response
  */
 export const addLearningResource = async (req: Request, res: Response) => {
   try {
-    const fresherId = parseInt(req.params.id);
+    const fresherId = parseInt(req.params.id || '');
     const { learning_title, description, learning_link, duration_minutes } = req.body;
 
     if (isNaN(fresherId)) {

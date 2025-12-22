@@ -26,7 +26,8 @@ export const ReviewAndSubmit = () => {
         return;
       }
 
-      const response = await fetch('http://localhost:3000/api/bgv/submission', {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE_URL}/bgv/submission`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -108,7 +109,8 @@ export const ReviewAndSubmit = () => {
 
       console.log('Submitting BGV form...');
       
-      const response = await fetch('http://localhost:3000/api/bgv/final-submit', {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE_URL}/bgv/final-submit`, {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${token}`,

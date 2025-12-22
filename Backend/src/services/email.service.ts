@@ -224,6 +224,8 @@ class EmailService {
     username: string, 
     temporaryPassword: string
   ): string {
+    const loginUrl = `${process.env.FRONTEND_URL}/login`;
+    
     return `
 Hi ${firstName} ${lastName},
 
@@ -233,6 +235,9 @@ Your account has been created successfully. Below are your login credentials:
 
 Username: ${username}
 Temporary Password: ${temporaryPassword}
+
+LOGIN TO YOUR ACCOUNT:
+Visit: ${loginUrl}
 
 IMPORTANT SECURITY INSTRUCTIONS:
 1. Please log in to the system as soon as possible
@@ -259,6 +264,8 @@ This is an automated message. Please do not reply to this email.
     username: string, 
     temporaryPassword: string
   ): string {
+    const loginUrl = `${process.env.FRONTEND_URL}/login`;
+    
     return `
 <!DOCTYPE html>
 <html lang="en">
@@ -276,6 +283,9 @@ This is an automated message. Please do not reply to this email.
         .credential-item { margin: 10px 0; }
         .credential-label { font-weight: bold; color: #374151; }
         .credential-value { font-family: monospace; background-color: #f3f4f6; padding: 4px 8px; border-radius: 4px; }
+        .btn-login { display: inline-block; background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%); color: white; padding: 14px 35px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 20px 0; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); }
+        .btn-login:hover { background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%); }
+        .login-section { text-align: center; margin: 25px 0; padding: 20px; background-color: #eff6ff; border-radius: 8px; }
     </style>
 </head>
 <body>
@@ -298,6 +308,13 @@ This is an automated message. Please do not reply to this email.
                 <span class="credential-label">Temporary Password:</span>
                 <span class="credential-value">${temporaryPassword}</span>
             </div>
+        </div>
+        
+        <div class="login-section">
+            <h3 style="color: #1e40af; margin-bottom: 15px;">🚀 Ready to Get Started?</h3>
+            <p style="margin-bottom: 20px; color: #4b5563;">Click the button below to access your account</p>
+            <a href="${loginUrl}" class="btn-login">Login to Your Account</a>
+            <p style="margin-top: 15px; font-size: 14px; color: #6b7280;">Or copy this link: <a href="${loginUrl}" style="color: #2563eb;">${loginUrl}</a></p>
         </div>
         
         <div class="warning">
@@ -396,6 +413,9 @@ Equipment Required:
 Please ensure all equipment is ready and configured before their start date.
 
 Please refer to the attached BGV form for complete employee information.
+
+ADMIN PORTAL ACCESS:
+Visit: ${process.env.FRONTEND_URL}/hr/login
 
 Best regards,
 HR Department
@@ -617,6 +637,20 @@ This is an automated notification from the onboarding system.
         <p>If you need any additional information about the new employee's role or specific equipment requirements, please coordinate with the HR department.</p>
         
         <p>Thank you for ensuring a smooth onboarding experience for our new team member!</p>
+        
+        <!-- Admin Login Link -->
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/hr/login" 
+             style="display: inline-block; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); 
+                    color: white; padding: 14px 35px; text-decoration: none; border-radius: 8px; 
+                    font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1); 
+                    transition: all 0.3s ease;">
+            🔐 Access Admin Portal
+          </a>
+          <p style="margin-top: 12px; font-size: 13px; color: #6c757d;">
+            Or visit: <a href="${process.env.FRONTEND_URL}/hr/login" style="color: #007bff;">${process.env.FRONTEND_URL}/hr/login</a>
+          </p>
+        </div>
         
         <p><strong>Best regards,</strong><br>HR Department</p>
     </div>
@@ -1051,6 +1085,9 @@ Please create and assign mandatory trainings for this employee as per company po
 
 Please refer to the attached BGV form for complete employee information to help customize the training plan.
 
+ADMIN PORTAL ACCESS:
+Visit: ${process.env.FRONTEND_URL}/hr/login
+
 Best regards,
 HR Department
 
@@ -1153,6 +1190,20 @@ This is an automated notification from the employee onboarding system.
         </div>
         <p>The complete BGV form is attached for your reference to help customize the training plan.</p>
         <p>For any questions, please contact the HR department.</p>
+        
+        <!-- Admin Login Link -->
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/hr/login" 
+             style="display: inline-block; background: linear-gradient(135deg, #28a745 0%, #20c997 100%); 
+                    color: white; padding: 14px 35px; text-decoration: none; border-radius: 8px; 
+                    font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            🔐 Access Admin Portal
+          </a>
+          <p style="margin-top: 12px; font-size: 13px; color: #6c757d;">
+            Or visit: <a href="${process.env.FRONTEND_URL}/hr/login" style="color: #28a745;">${process.env.FRONTEND_URL}/hr/login</a>
+          </p>
+        </div>
+        
         <div class="footer">
             <p><strong>Best regards,</strong><br>HR Department<br>WinWire Technologies</p>
         </div>
@@ -1380,6 +1431,20 @@ This is an automated notification from the employee onboarding system.
             </ul>
         </div>
         <p>This employee has been notified about the deadline expiry and that you will be contacting them.</p>
+        
+        <!-- Admin Login Link -->
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/hr/login" 
+             style="display: inline-block; background: linear-gradient(135deg, #dc3545 0%, #c82333 100%); 
+                    color: white; padding: 14px 35px; text-decoration: none; border-radius: 8px; 
+                    font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            🔐 Access Admin Portal
+          </a>
+          <p style="margin-top: 12px; font-size: 13px; color: #6c757d;">
+            Or visit: <a href="${process.env.FRONTEND_URL}/hr/login" style="color: #dc3545;">${process.env.FRONTEND_URL}/hr/login</a>
+          </p>
+        </div>
+        
         <div class="footer">
             <p><strong>Best regards,</strong><br>Learning & Development System<br>WinWire Technologies</p>
             <p style="font-size: 12px; color: #999;">This is an automated notification. Please do not reply to this email.</p>
@@ -1428,6 +1493,9 @@ Please review the employee's progress and take appropriate action:
 • Update their learning plan as necessary
 
 This employee has been notified about the deadline expiry and that you will be contacting them.
+
+ADMIN PORTAL ACCESS:
+Visit: ${process.env.FRONTEND_URL}/hr/login
 
 Best regards,
 Learning & Development System
@@ -1516,6 +1584,20 @@ This is an automated notification. Please do not reply to this email.
         </div>
         <p><strong>Important:</strong> Please continue accessing your learning resources. Your account remains active.</p>
         <p>If you have any immediate questions or concerns, please reach out to the L&D team directly.</p>
+        
+        <!-- Employee Login Link -->
+        <div style="text-align: center; margin: 30px 0;">
+          <a href="${process.env.FRONTEND_URL}/login" 
+             style="display: inline-block; background: linear-gradient(135deg, #17a2b8 0%, #138496 100%); 
+                    color: white; padding: 14px 35px; text-decoration: none; border-radius: 8px; 
+                    font-weight: 600; font-size: 16px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.1);">
+            🔐 Login to Portal
+          </a>
+          <p style="margin-top: 12px; font-size: 13px; color: #6c757d;">
+            Or visit: <a href="${process.env.FRONTEND_URL}/login" style="color: #17a2b8;">${process.env.FRONTEND_URL}/login</a>
+          </p>
+        </div>
+        
         <div class="footer">
             <p><strong>Keep Learning,</strong><br>Learning & Development Team<br>WinWire Technologies</p>
             <p style="font-size: 12px; color: #999;">This is an automated notification. Please do not reply to this email.</p>
@@ -1559,6 +1641,9 @@ The L&D team will review your progress and get in touch with you regarding:
 IMPORTANT: Please continue accessing your learning resources. Your account remains active.
 
 If you have any immediate questions or concerns, please reach out to the L&D team directly.
+
+EMPLOYEE PORTAL LOGIN:
+Visit: ${process.env.FRONTEND_URL}/login
 
 Keep Learning,
 Learning & Development Team

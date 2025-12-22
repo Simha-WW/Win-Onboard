@@ -15,7 +15,7 @@ class BlobUploadService {
 
   constructor() {
     // Use environment variable or default to backend URL
-    this.baseUrl = import.meta.env.VITE_API_URL || 'http://localhost:3000/api';
+    this.baseUrl = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
   }
 
   /**

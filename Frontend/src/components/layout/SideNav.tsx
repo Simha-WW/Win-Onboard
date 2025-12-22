@@ -5,13 +5,11 @@
 import { NavLink, useLocation } from 'react-router-dom';
 import {
   FiHome,
-  FiCheckSquare,
   FiFileText,
   FiCalendar,
   FiBookOpen,
   FiBell,
   FiMenu,
-  FiBriefcase,
   FiFolder
 } from 'react-icons/fi';
 
@@ -25,11 +23,9 @@ interface NavItem {
 
 const navItems: NavItem[] = [
   { id: 'home', label: 'Home', path: '/dashboard', icon: FiHome },
-  { id: 'checklist', label: 'Checklist', path: '/dashboard/checklist', icon: FiCheckSquare },
   { id: 'documents', label: 'Documents', path: '/dashboard/documents', icon: FiFileText },
   { id: 'policies', label: 'Policies', path: '/dashboard/policies', icon: FiFolder },
   { id: 'learning', label: 'Learning', path: '/dashboard/learning', icon: FiBookOpen },
-  { id: 'training', label: 'Training', path: '/dashboard/training', icon: FiBriefcase },
   { id: 'notifications', label: 'Notifications', path: '/dashboard/notifications', icon: FiBell, badge: 3 }
 ];
 

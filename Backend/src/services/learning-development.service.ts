@@ -257,18 +257,20 @@ export class LearningDevelopmentService {
       }
 
       // Get all learnings from the appropriate table
-      const learnings: LearningItem[] = await pool.request()
+      const learningsResult = await pool.request()
         .query(`SELECT id, learning_title as title, description, learning_link, duration_minutes FROM ${learningTable} ORDER BY id`);
 
-      if (learnings.recordset.length === 0) {
+      const learnings: LearningItem[] = learningsResult.recordset;
+
+      if (learnings.length === 0) {
         console.log(`⚠️ No learnings found in ${learningTable}`);
         return;
       }
 
-      const totalCount = learnings.recordset.length;
+      const totalCount = learnings.length;
 
       // Calculate total duration in days (sum of duration_minutes / 60 / 24) + 2 extra days
-      const totalMinutes = learnings.recordset.reduce((sum: number, learning: any) => sum + (learning.duration_minutes || 0), 0);
+      const totalMinutes = learnings.reduce((sum: number, learning: any) => sum + (learning.duration_minutes || 0), 0);
       const durationInDays = Math.ceil(totalMinutes / 60 / 24) + 2; // Add 2 extra days
       const deadline = new Date();
       deadline.setDate(deadline.getDate() + durationInDays);
@@ -288,7 +290,7 @@ export class LearningDevelopmentService {
         `);
 
       // Create progress records for each learning item
-      for (const learning of learnings.recordset) {
+      for (const learning of learnings) {
         await pool.request()
           .input('fresherId', mssql.Int, fresherId)
           .input('learningId', mssql.Int, learning.id)
@@ -413,11 +415,11 @@ export class LearningDevelopmentService {
         </div>
       `;
 
-      await emailService.sendEmail(
-        user.email,
-        emailSubject,
-        emailBody
-      );
+      await emailService.sendEmail({
+        to: user.email,
+        subject: emailSubject,
+        html: emailBody
+      });
 
       console.log(`✅ Learning plan assignment email sent to ${user.email}`);
     } catch (error) {

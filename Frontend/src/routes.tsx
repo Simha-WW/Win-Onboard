@@ -6,12 +6,10 @@
 import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { Shell } from './components/layout/Shell';
 import { NewHireHome } from './pages/NewHireHome';
-import { Checklist } from './pages/Checklist';
 import { Documents } from './pages/Documents';
 import { ReviewAndSubmit } from './pages/ReviewAndSubmit';
 import { Policies } from './pages/Policies';
 import { UserLearning } from './pages/UserLearning';
-import { Training } from './pages/Training';
 import { Notifications } from './pages/Notifications';
 import { Login } from './pages/Login';
 import { ProtectedRoute } from './components/auth/ProtectedRoute';
@@ -69,10 +67,6 @@ export const router = createBrowserRouter([
         element: <NewHireHome />
       },
       {
-        path: 'checklist',
-        element: <Checklist />
-      },
-      {
         path: 'documents',
         element: <Documents />
       },
@@ -87,10 +81,6 @@ export const router = createBrowserRouter([
       {
         path: 'learning',
         element: <UserLearning />
-      },
-      {
-        path: 'training',
-        element: <Training />
       },
       {
         path: 'notifications',

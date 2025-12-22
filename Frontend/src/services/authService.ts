@@ -141,7 +141,7 @@ authApi.interceptors.response.use(
       const token = localStorage.getItem('auth_token');
       if (token) {
         try {
-          const refreshResponse = await fetch('http://localhost:3000/api/auth/refresh', {
+          const refreshResponse = await fetch(`${API_BASE_URL}/auth/refresh`, {
             method: 'POST',
             headers: {
               'Authorization': `Bearer ${token}`,

@@ -26,7 +26,8 @@ export default function AIAgentChat() {
     setLoading(true);
     
     try {
-      const resp = await fetch('/api/features/ai-agent/chat', {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+      const resp = await fetch(`${API_BASE_URL}/features/ai-agent/chat`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ 

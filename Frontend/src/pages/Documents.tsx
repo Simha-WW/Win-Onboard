@@ -159,7 +159,8 @@ export const Documents = () => {
 
         console.log('📡 Making API call to /api/bgv/submission...');
         
-        const response = await fetch('http://localhost:3000/api/bgv/submission', {
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+        const response = await fetch(`${API_BASE_URL}/bgv/submission`, {
           method: 'GET',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -774,7 +775,8 @@ export const Documents = () => {
         )
       };
 
-      const response = await fetch('http://localhost:3000/api/bgv/personal', {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE_URL}/bgv/personal`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -1507,7 +1509,8 @@ export const Documents = () => {
       await handleSave();
 
       // Submit the entire BGV form
-      const response = await fetch('http://localhost:3000/api/bgv/submit', {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE_URL}/bgv/submit`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

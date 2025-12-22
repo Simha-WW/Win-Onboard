@@ -66,7 +66,7 @@ export const updateUserLearningProgress = async (req: Request, res: Response) =>
   try {
     // @ts-ignore - fresherId is added by auth middleware
     const fresherId = req.user?.fresherId || req.user?.id;
-    const progressId = parseInt(req.params.progressId);
+    const progressId = parseInt(req.params.progressId || "0");
     const { isCompleted, progressPercentage, notes } = req.body;
 
     if (!fresherId) {

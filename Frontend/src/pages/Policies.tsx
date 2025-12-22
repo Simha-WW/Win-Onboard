@@ -2,19 +2,78 @@
  * Policies Page - Contains company policies and documents for download
  */
 
+import React, { useState, useEffect } from 'react';
 import { FiFileText, FiDownload, FiEye, FiFile } from 'react-icons/fi';
+import { API_BASE_URL } from '../config';
+
+interface PolicyDocument {
+  id: string;
+  name: string;
+  fileName: string;
+  type: string;
+  size: string;
+  status: 'required' | 'optional';
+  sasUrl?: string;
+}
 
 export const Policies = () => {
   console.log('Policies component rendering...');
   
-  const documents = [
-    { id: 1, name: 'Employee Handbook', type: 'PDF', size: '2.4 MB', status: 'required' },
-    { id: 2, name: 'Benefits Guide', type: 'PDF', size: '1.8 MB', status: 'optional' },
-    { id: 3, name: 'Code of Conduct', type: 'PDF', size: '856 KB', status: 'required' },
-    { id: 4, name: 'Emergency Procedures', type: 'PDF', size: '1.2 MB', status: 'required' },
-    { id: 5, name: 'IT Security Policy', type: 'PDF', size: '945 KB', status: 'required' },
-    { id: 6, name: 'Org Chart', type: 'PDF', size: '632 KB', status: 'optional' }
-  ];
+  const [documents, setDocuments] = useState<PolicyDocument[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    fetchPolicies();
+  }, []);
+
+  const fetchPolicies = async () => {
+    try {
+      setLoading(true);
+      const token = localStorage.getItem('auth_token');
+      
+      const response = await fetch(`${API_BASE_URL}/policies`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+          'Content-Type': 'application/json'
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error('Failed to fetch policies');
+      }
+
+      const result = await response.json();
+      setDocuments(result.data || []);
+      setError(null);
+    } catch (err: any) {
+      console.error('Error fetching policies:', err);
+      setError(err.message || 'Failed to load policies');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleDownload = (doc: PolicyDocument) => {
+    if (doc.sasUrl) {
+      const link = document.createElement('a');
+      link.href = doc.sasUrl;
+      link.download = doc.fileName || doc.name + '.pdf';
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    } else {
+      alert('This document is not yet available. Please check back later.');
+    }
+  };
+
+  const handleView = (doc: PolicyDocument) => {
+    if (doc.sasUrl) {
+      window.open(doc.sasUrl, '_blank');
+    } else {
+      alert('This document is not yet available. Please check back later.');
+    }
+  };
 
   const getFileIcon = (type: string) => {
     switch (type) {
@@ -22,6 +81,30 @@ export const Policies = () => {
       default: return <FiFile style={{ color: '#6b7280', width: '24px', height: '24px' }} />;
     }
   };
+
+  if (loading) {
+    return (
+      <div style={{ padding: '20px', backgroundColor: 'white', minHeight: '500px', display: 'flex', justifyContent: 'center', alignItems: 'center' }}>
+        <div>Loading policies...</div>
+      </div>
+    );
+  }
+
+  if (error) {
+    return (
+      <div style={{ padding: '20px', backgroundColor: 'white', minHeight: '500px' }}>
+        <div style={{
+          padding: '16px',
+          backgroundColor: '#fee2e2',
+          border: '1px solid #fecaca',
+          borderRadius: '8px',
+          color: '#dc2626'
+        }}>
+          {error}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div style={{ padding: '20px', backgroundColor: 'white', minHeight: '500px' }}>
@@ -115,20 +198,26 @@ export const Policies = () => {
                 justifyContent: 'center',
                 gap: '8px',
                 padding: '10px 16px',
-                backgroundColor: '#3b82f6',
+                backgroundColor: doc.sasUrl ? '#3b82f6' : '#d1d5db',
                 color: 'white',
                 border: 'none',
                 borderRadius: '8px',
                 fontSize: '14px',
                 fontWeight: '500',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
+                cursor: doc.sasUrl ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s ease',
+                opacity: doc.sasUrl ? 1 : 0.6
               }}
+              onClick={() => handleDownload(doc)}
               onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = '#2563eb';
+                if (doc.sasUrl) {
+                  e.currentTarget.style.backgroundColor = '#2563eb';
+                }
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = '#3b82f6';
+                if (doc.sasUrl) {
+                  e.currentTarget.style.backgroundColor = '#3b82f6';
+                }
               }}>
                 <FiDownload style={{ width: '16px', height: '16px' }} />
                 Download
@@ -136,20 +225,26 @@ export const Policies = () => {
 
               <button style={{
                 padding: '10px',
-                backgroundColor: '#f8f9fa',
-                color: '#6b7280',
+                backgroundColor: doc.sasUrl ? '#f8f9fa' : '#f3f4f6',
+                color: doc.sasUrl ? '#6b7280' : '#9ca3af',
                 border: '1px solid #e5e7eb',
                 borderRadius: '8px',
-                cursor: 'pointer',
-                transition: 'all 0.2s ease'
+                cursor: doc.sasUrl ? 'pointer' : 'not-allowed',
+                transition: 'all 0.2s ease',
+                opacity: doc.sasUrl ? 1 : 0.6
               }}
+              onClick={() => handleView(doc)}
               onMouseOver={(e) => {
-                e.currentTarget.style.backgroundColor = '#e5e7eb';
-                e.currentTarget.style.color = '#374151';
+                if (doc.sasUrl) {
+                  e.currentTarget.style.backgroundColor = '#e5e7eb';
+                  e.currentTarget.style.color = '#374151';
+                }
               }}
               onMouseOut={(e) => {
-                e.currentTarget.style.backgroundColor = '#f8f9fa';
-                e.currentTarget.style.color = '#6b7280';
+                if (doc.sasUrl) {
+                  e.currentTarget.style.backgroundColor = '#f8f9fa';
+                  e.currentTarget.style.color = '#6b7280';
+                }
               }}>
                 <FiEye style={{ width: '16px', height: '16px' }} />
               </button>

@@ -71,6 +71,11 @@ export class DeadlineExpiryService {
       // Process each expired deadline
       for (const assignment of result.recordset) {
         try {
+          // Calculate completion percentage
+          const completionPercentage = assignment.total_count > 0
+            ? Math.round((assignment.completed_count / assignment.total_count) * 100)
+            : 0;
+
           // Send email to L&D team
           const ldResult = await emailService.sendDeadlineExpiryToLD(
             ldEmail,

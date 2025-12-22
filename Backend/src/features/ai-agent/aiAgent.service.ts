@@ -118,7 +118,7 @@ Be helpful, professional, and provide accurate information based on this knowled
           "The onboarding process includes document submission, verification, background checks, and IT setup.",
           "I can help you understand what documents are required and guide you through the onboarding process."
         ];
-        return responses[Math.floor(Math.random() * responses.length)];
+        return responses[Math.floor(Math.random() * responses.length)] ?? "";
       }
 
       // Get conversation history
@@ -162,7 +162,11 @@ Be helpful, professional, and provide accurate information based on this knowled
       // Keep only last 10 messages to avoid token limits
       if (messages.length > 11) {
         const systemMessage = messages[0];
-        this.conversationHistory.set(threadId, [systemMessage, ...messages.slice(-10)]);
+        if (systemMessage) {
+          this.conversationHistory.set(threadId, [systemMessage, ...messages.slice(-10)]);
+        } else {
+          this.conversationHistory.set(threadId, messages.slice(-10));
+        }
       }
 
       console.log(`[AI Agent] Response generated successfully`);

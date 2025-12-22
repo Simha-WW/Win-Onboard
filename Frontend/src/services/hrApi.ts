@@ -79,7 +79,7 @@ interface ItTaskUpdate {
  * Centralized service for all HR-related API calls
  */
 class HrApiService {
-  private baseUrl = 'http://localhost:3000/api/hr';
+  private baseUrl = `${import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api'}/hr`;
 
   /**
    * Create a new fresher account
@@ -136,7 +136,8 @@ class HrApiService {
         throw new Error('Access token is required');
       }
 
-      const response = await fetch('http://localhost:3000/api/it/send-to-it', {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE_URL}/it/send-to-it`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -167,7 +168,8 @@ class HrApiService {
         throw new Error('Access token is required');
       }
 
-      const response = await fetch('http://localhost:3000/api/it/tasks', {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE_URL}/it/tasks`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -197,7 +199,8 @@ class HrApiService {
         throw new Error('Access token is required');
       }
 
-      const response = await fetch(`http://localhost:3000/api/it/tasks/${taskId}`, {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE_URL}/it/tasks/${taskId}`, {
         method: 'GET',
         headers: {
           'Authorization': `Bearer ${token}`,
@@ -228,7 +231,8 @@ class HrApiService {
         throw new Error('Access token is required');
       }
 
-      const response = await fetch(`http://localhost:3000/api/it/tasks/${taskId}`, {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+      const response = await fetch(`${API_BASE_URL}/it/tasks/${taskId}`, {
         method: 'PATCH',
         headers: {
           'Content-Type': 'application/json',
