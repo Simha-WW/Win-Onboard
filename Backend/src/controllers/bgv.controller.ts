@@ -111,6 +111,9 @@ export class BGVController {
       }
 
       const submission = await BGVService.getOrCreateSubmission(userId);
+      console.log('📋 Submission object from service:', submission);
+      console.log('📋 Submission status:', submission?.submission_status);
+      
       const prefilledData = await BGVService.getFresherDataForDemographics(userId);
       const savedDemographics = await BGVService.getSavedDemographics(submission.id);
       
@@ -126,7 +129,9 @@ export class BGVController {
       try {
         // userId is the fresher_id from the token
         const fresherId = parseInt(userId.toString());
+        console.log('🔍 Fetching education data for fresher_id:', fresherId);
         const educationalData = await BGVService.getSavedEducational(fresherId);
+        console.log('🔍 Raw educational data from service:', JSON.stringify(educationalData, null, 2));
         
         // Separate educational qualifications and additional certificates
         const educationalQualifications = educationalData.filter(
@@ -142,7 +147,8 @@ export class BGVController {
         };
         
         console.log('📋 Loaded education data for fresher:', fresherId);
-        console.log('📋 Educational qualifications:', educationalQualifications.length);
+        console.log('📋 Educational qualifications count:', educationalQualifications.length);
+        console.log('📋 Educational qualifications data:', JSON.stringify(educationalQualifications, null, 2));
         console.log('📋 Additional qualifications:', additionalQualifications.length);
       } catch (educationError) {
         console.error('⚠️ Error loading education data (table may need schema update):', educationError);

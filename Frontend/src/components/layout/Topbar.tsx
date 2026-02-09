@@ -81,33 +81,15 @@ export const Topbar = ({
 
             {/* Brand Logo - Responsive and prominent */}
             <div className="flex items-center" style={{ gap: 'var(--spacing-md)' }}>
-              <div 
-                className="bg-gradient-to-r from-[var(--brand-primary)] to-[var(--brand-primary-dark)] flex items-center justify-center shadow-lg"
+              <img 
+                src="/images/logo.png" 
+                alt="WinOnboard Logo" 
                 style={{
-                  width: 'var(--size-4xl)',   /* 36px on mobile */
-                  height: 'var(--size-4xl)',
-                  borderRadius: 'var(--radius-xl)'
+                  height: '40px',
+                  width: 'auto',
+                  objectFit: 'contain'
                 }}
-              >
-                <img 
-                  src="/images/logo.jpg" 
-                  alt="Company Logo" 
-                  style={{
-                    width: 'var(--icon-md)',
-                    height: 'var(--icon-md)',
-                    borderRadius: 'var(--radius-md)'
-                  }}
-                />
-              </div>
-              <span 
-                className="font-bold tracking-tight"
-                style={{
-                  fontSize: 'var(--font-scale-2xl)',  /* Responsive: lg on desktop, xl on mobile */
-                  color: 'var(--text-primary)'
-                }}
-              >
-                WinOnboard
-              </span>
+              />
             </div>
 
             {/* Search Bar - Semantic sizing and responsive width */}

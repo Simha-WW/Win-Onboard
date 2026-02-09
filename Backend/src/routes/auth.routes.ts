@@ -19,6 +19,12 @@ const router = Router();
  * Public authentication routes (with rate limiting)
  */
 
+// Google OAuth authentication for admins (HR, IT, L&D)
+router.post('/google',
+  authRateLimit,
+  AuthController.authenticateWithGoogle
+);
+
 // HR login with email and password (NEW)
 router.post('/hr/login',
   authRateLimit,

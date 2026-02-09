@@ -16,7 +16,7 @@ router.use(requireAuthenticated);
 
 // User BGV routes
 router.get('/fresher-details', bgvController.getFresherDetails.bind(bgvController));
-router.get('/submission', bgvController.getSubmissionData.bind(bgvController));
+router.get('/submission', bgvController.getSubmission.bind(bgvController));
 router.post('/demographics', bgvController.saveDemographics.bind(bgvController));
 router.post('/personal', bgvController.savePersonalInfo.bind(bgvController));
 router.get('/education', bgvController.getEducation.bind(bgvController));

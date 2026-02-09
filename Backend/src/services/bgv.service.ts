@@ -607,9 +607,9 @@ export class BGVService {
             comm_state, comm_country, comm_pin_code, perm_same_as_comm,
             perm_house_number, perm_street_name, perm_city, perm_district,
             perm_state, perm_country, perm_pin_code,
-            aadhaar_file_name, aadhaar_file_type, aadhaar_file_size,
-            pan_file_name, pan_file_type, pan_file_size,
-            resume_file_name, resume_file_type, resume_file_size
+            aadhaar_file_name, aadhaar_file_type, aadhaar_file_size, aadhaar_doc_file_url,
+            pan_file_name, pan_file_type, pan_file_size, pan_file_url,
+            resume_file_name, resume_file_type, resume_file_size, resume_file_url
           FROM bgv_demographics 
           WHERE submission_id = @submissionId
         `);
@@ -2417,11 +2417,23 @@ export class BGVService {
         pool.request().input('id', mssql.Int, fresherId).query('SELECT * FROM bank_pf_nps WHERE fresher_id = @id')
       ]);
 
+      // Structure education data properly
+      const educationalData = education.recordset || [];
+      const educationalQualifications = educationalData.filter(
+        (item: any) => item.qualification_type === 'educational'
+      );
+      const additionalQualifications = educationalData.filter(
+        (item: any) => item.qualification_type === 'additional'
+      );
+
       return {
         savedDemographics: demographics.recordset?.[0] || null,
         savedPersonal: personal.recordset?.[0] || null,
         savedEmployment: employment.recordset || [],
-        savedEducation: education.recordset || [],
+        savedEducation: {
+          educationalQualifications,
+          additionalQualifications
+        },
         savedPassportVisa: passportVisa.recordset?.[0] || null,
         savedBankPfNps: bankPfNps.recordset?.[0] || null
       };

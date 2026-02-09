@@ -39,8 +39,6 @@ const fileToBase64 = (file: File): Promise<string> => {
 };
 
 export const Documents = () => {
-  console.log('BGV Documents component rendering...');
-  
   const navigate = useNavigate();
   const [activeSection, setActiveSection] = useState(0);
   const [formData, setFormData] = useState({
@@ -143,22 +141,23 @@ export const Documents = () => {
   const [errors, setErrors] = useState({});
   const [loading, setLoading] = useState(false);
   const [prefilledData, setPrefilledData] = useState(null);
+  const [submissionStatus, setSubmissionStatus] = useState<{
+    status: string;
+    submitted_at: string | null;
+    reviewed_at: string | null;
+    review_comments: string | null;
+  } | null>(null);
 
   // Fetch user details on component mount
   useEffect(() => {
     const fetchBGVData = async () => {
       try {
         const token = localStorage.getItem('auth_token');
-        console.log('🔑 Auth token found:', token ? `Yes (${token.substring(0, 20)}...)` : 'No');
         
         if (!token) {
-          console.log('⚠️ No authentication token found in localStorage');
-          console.log('🔍 Available localStorage keys:', Object.keys(localStorage));
           return;
         }
 
-        console.log('📡 Making API call to /api/bgv/submission...');
-        
         const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
         const response = await fetch(`${API_BASE_URL}/bgv/submission`, {
           method: 'GET',
@@ -168,12 +167,21 @@ export const Documents = () => {
           }
         });
 
-        console.log('📊 Response status:', response.status);
-        console.log('📊 Response OK:', response.ok);
-
         if (response.ok) {
           const result = await response.json();
-          console.log('📋 Full BGV API response:', result);
+          console.log('📋 Submission object:', result.submission);
+          console.log('📋 Submission status:', result.submission?.submission_status);
+          
+          // Store submission status
+          if (result.submission) {
+            setSubmissionStatus({
+              status: result.submission.submission_status,
+              submitted_at: result.submission.submitted_at,
+              reviewed_at: result.submission.reviewed_at,
+              review_comments: result.submission.review_comments
+            });
+            console.log('📋 Submission status:', result.submission.submission_status);
+          }
           
           if (result.success) {
             // Handle prefilled data from user profile
@@ -186,7 +194,6 @@ export const Documents = () => {
             // Handle saved BGV demographics data
             if (result.savedDemographics) {
               const saved = result.savedDemographics;
-              console.log('📋 Saved demographics found:', saved);
               
               // Map the saved data to form structure
               const savedFormData = {
@@ -255,22 +262,30 @@ export const Documents = () => {
             // Handle saved personal data
             if (result.savedPersonal) {
               const saved = result.savedPersonal;
-              console.log('📋 Saved personal found:', saved);
-              console.log('📋 Emergency contacts from DB:', saved.emergency_contacts);
-              console.log('📋 Emergency contacts type:', typeof saved.emergency_contacts);
-              console.log('📋 Emergency contacts is array?', Array.isArray(saved.emergency_contacts));
 
               // Map backend field names to frontend field names
-              const emergencyContacts = saved.emergency_contacts && Array.isArray(saved.emergency_contacts) && saved.emergency_contacts.length > 0 
-                ? saved.emergency_contacts.map(contact => ({
+              let emergencyContacts = [{ name: '', mobile: '', relationship: '' }];
+              
+              if (saved.emergency_contacts) {
+                // Handle if it's a string (needs parsing)
+                let contactsData = saved.emergency_contacts;
+                if (typeof contactsData === 'string') {
+                  try {
+                    contactsData = JSON.parse(contactsData);
+                  } catch (e) {
+                    console.error('❌ Error parsing emergency_contacts string:', e);
+                  }
+                }
+                
+                // Now map the array if it's valid
+                if (Array.isArray(contactsData) && contactsData.length > 0) {
+                  emergencyContacts = contactsData.map(contact => ({
                     name: contact.contact_person_name || contact.name || '',
-                    mobile: contact.mobile || '',
+                    mobile: contact.mobile || contact.mobile_number || '',
                     relationship: contact.relationship || ''
-                  }))
-                : [{ name: '', mobile: '', relationship: '' }];
-
-              console.log('📋 Setting emergency contacts to:', emergencyContacts);
-              console.log('📋 First contact details:', emergencyContacts[0]);
+                  }));
+                }
+              }
 
               setFormData(prev => {
                 const newData = {
@@ -287,23 +302,25 @@ export const Documents = () => {
                     emergencyContacts: emergencyContacts
                   }
                 };
-                console.log('📋 New form data after personal update:', newData);
                 return newData;
               });
-
-              console.log('✅ Form populated with saved personal data');
-              console.log('✅ Emergency contacts loaded:', emergencyContacts);
             }
 
             // Handle saved education data
             if (result.savedEducation) {
               const saved = result.savedEducation;
-              console.log('📋 Saved education found:', saved);
-              console.log('📋 Educational qualifications:', saved.educationalQualifications);
-              console.log('📋 Additional qualifications:', saved.additionalQualifications);
 
+              // Map educational qualifications with proper field names
               const educationalQualifications = saved.educationalQualifications && saved.educationalQualifications.length > 0
-                ? saved.educationalQualifications 
+                ? saved.educationalQualifications.map((qual: any) => ({
+                    qualification: qual.qualification || '',
+                    university_institution: qual.university_institution || qual.universityInstitution || '',
+                    cgpa_percentage: qual.cgpa_percentage || qual.cgpaPercentage || '',
+                    year_of_passing: qual.year_of_passing || qual.yearOfPassing || '',
+                    documentUrl: qual.documentUrl || qual.document_url || '',
+                    documentName: qual.documentName || qual.certificate_name || (qual.documentUrl || qual.document_url || '').split('/').pop() || '',
+                    uploadingDocument: false
+                  }))
                 : [{
                     qualification: '',
                     university_institution: '',
@@ -314,6 +331,19 @@ export const Documents = () => {
                     uploadingDocument: false
                   }];
 
+              // Map additional qualifications with proper field names
+              const additionalQualifications = saved.additionalQualifications && saved.additionalQualifications.length > 0
+                ? saved.additionalQualifications.map((qual: any) => ({
+                    qualification: qual.qualification || '',
+                    university_institution: qual.university_institution || qual.universityInstitution || '',
+                    cgpa_percentage: qual.cgpa_percentage || qual.cgpaPercentage || '',
+                    year_of_passing: qual.year_of_passing || qual.yearOfPassing || '',
+                    documentUrl: qual.documentUrl || qual.document_url || '',
+                    documentName: qual.documentName || qual.certificate_name || (qual.documentUrl || qual.document_url || '').split('/').pop() || '',
+                    uploadingDocument: false
+                  }))
+                : [];
+
               console.log('📋 Setting qualifications to:', educationalQualifications);
               console.log('📋 First qualification details:', educationalQualifications[0]);
 
@@ -322,20 +352,16 @@ export const Documents = () => {
                   ...prev,
                   education: {
                     qualifications: educationalQualifications,
-                    additionalQualifications: saved.additionalQualifications || []
+                    additionalQualifications: additionalQualifications
                   }
                 };
-                console.log('📋 New form data after education update:', newData);
                 return newData;
               });
-
-              console.log('✅ Form populated with saved education data');
             }
 
             // Handle saved employment data
             if (result.savedEmployment) {
               const saved = result.savedEmployment;
-              console.log('📋 Saved employment found:', saved);
 
               const employmentHistory = saved.employmentHistory && saved.employmentHistory.length > 0
                 ? saved.employmentHistory.map(emp => ({
@@ -365,14 +391,11 @@ export const Documents = () => {
                   employmentHistory: employmentHistory
                 }
               }));
-
-              console.log('✅ Form populated with saved employment data');
             }
 
             // Handle saved passport/visa data
             if (result.savedPassportVisa) {
               const saved = result.savedPassportVisa;
-              console.log('📋 Saved passport/visa found:', saved);
 
               setFormData(prev => ({
                 ...prev,
@@ -395,7 +418,6 @@ export const Documents = () => {
             // Handle saved bank/pf/nps data
             if (result.savedBankPfNps) {
               const saved = result.savedBankPfNps;
-              console.log('📋 Saved bank/pf/nps found:', saved);
 
               setFormData(prev => ({
                 ...prev,
@@ -1397,7 +1419,9 @@ export const Documents = () => {
           return;
       }
 
-      const response = await fetch(`http://localhost:3000${apiEndpoint}`, {
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.REACT_APP_API_BASE_URL || 'http://localhost:3000/api';
+      const baseUrl = API_BASE_URL.replace('/api', '');
+      const response = await fetch(`${baseUrl}${apiEndpoint}`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -3759,6 +3783,45 @@ export const Documents = () => {
       <p style={{ color: '#6b7280', fontSize: '16px', marginBottom: '30px' }}>
         Complete your background verification by submitting all required documents and information.
       </p>
+
+      {/* Submission Status Banner */}
+      {submissionStatus && submissionStatus.status === 'submitted' && (
+        <div style={{
+          backgroundColor: '#10b981',
+          color: 'white',
+          padding: '16px 20px',
+          borderRadius: '12px',
+          marginBottom: '30px',
+          display: 'flex',
+          alignItems: 'center',
+          gap: '12px',
+          boxShadow: '0 4px 6px -1px rgba(16, 185, 129, 0.3)'
+        }}>
+          <FiCheck style={{ fontSize: '24px', flexShrink: 0 }} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: '18px', fontWeight: '600', marginBottom: '4px' }}>
+              ✅ Documents Submitted Successfully
+            </div>
+            <div style={{ fontSize: '14px', opacity: 0.9 }}>
+              Your documents were submitted on {submissionStatus.submitted_at ? new Date(submissionStatus.submitted_at).toLocaleString('en-US', {
+                dateStyle: 'medium',
+                timeStyle: 'short'
+              }) : 'N/A'}. The HR team will review your submission.
+            </div>
+            {submissionStatus.review_comments && (
+              <div style={{ 
+                marginTop: '8px', 
+                padding: '8px 12px', 
+                backgroundColor: 'rgba(255,255,255,0.2)', 
+                borderRadius: '6px',
+                fontSize: '13px'
+              }}>
+                <strong>Review Comments:</strong> {submissionStatus.review_comments}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* Section Navigation */}
       <div style={{ 

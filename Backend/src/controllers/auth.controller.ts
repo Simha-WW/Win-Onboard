@@ -6,6 +6,7 @@
 import { Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
 import { AuthService } from '../services/auth.service';
+import { googleAuthService } from '../services/googleAuth.service';
 import { AuthenticatedRequest } from '../middleware/auth.middleware';
 
 // Rate limiting for auth endpoints
@@ -339,6 +340,102 @@ export class AuthController {
         success: false,
         message: 'Failed to setup HR table',
         error: error?.message || 'Unknown error'
+      });
+    }
+  }
+
+  /**
+   * Google OAuth authentication for admin users (HR, IT, L&D)
+   * POST /api/auth/google
+   * Body: { token: string } - Google OAuth token from frontend
+   */
+  static async authenticateWithGoogle(req: Request, res: Response): Promise<Response | void> {
+    try {
+      const { token } = req.body;
+
+      if (!token) {
+        return res.status(400).json({
+          success: false,
+          message: 'Google OAuth token is required'
+        });
+      }
+
+      console.log('🔐 Google OAuth authentication attempt...');
+
+      // Verify token and authenticate admin user
+      const adminUser = await googleAuthService.authenticateAdmin(token);
+
+      // Parse name into first and last name
+      const nameParts = adminUser.name ? adminUser.name.split(' ') : ['', ''];
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      // Transform to User format expected by generateToken
+      const user = {
+        id: adminUser.id.toString(),
+        email: adminUser.email,
+        firstName: firstName,
+        lastName: lastName,
+        username: adminUser.email.split('@')[0],
+        designation: adminUser.role,
+        department: adminUser.department,
+        role: adminUser.department // 'HR', 'IT', or 'LD'
+      };
+
+      // Generate JWT token for session
+      const jwtToken = AuthService.generateToken(user);
+
+      console.log(`✅ Google OAuth authentication successful for ${adminUser.email} (${adminUser.department})`);
+
+      return res.status(200).json({
+        success: true,
+        message: 'Authentication successful',
+        data: {
+          token: jwtToken,
+          user: {
+            id: adminUser.id,
+            email: adminUser.email,
+            name: adminUser.name,
+            department: adminUser.department,
+            role: adminUser.department, // Use department as role ('HR', 'IT', 'LD') for routing
+            isAdmin: true
+          }
+        }
+      });
+
+    } catch (error: any) {
+      console.error('Google OAuth authentication error:', error);
+
+      // Handle specific error cases
+      if (error.message?.includes('UNAUTHORIZED')) {
+        return res.status(403).json({
+          success: false,
+          message: 'You are not authorized to access this system. Please contact your administrator.',
+          error: 'EMAIL_NOT_REGISTERED'
+        });
+      }
+
+      if (error.message?.includes('INACTIVE')) {
+        return res.status(403).json({
+          success: false,
+          message: 'Your account has been deactivated. Please contact your administrator.',
+          error: 'ACCOUNT_INACTIVE'
+        });
+      }
+
+      if (error.message?.includes('Invalid Google token')) {
+        return res.status(401).json({
+          success: false,
+          message: 'Invalid Google authentication token. Please try again.',
+          error: 'INVALID_TOKEN'
+        });
+      }
+
+      // Generic error response
+      return res.status(500).json({
+        success: false,
+        message: 'Authentication failed. Please try again.',
+        error: 'AUTHENTICATION_FAILED'
       });
     }
   }
